@@ -1,7 +1,11 @@
 version: '3.0'
 services:
   activepieces:
-    image: ghcr.io/activepieces/activepieces:0.68.1
+    build:
+      context: .                # folder containing the Dockerfile
+      dockerfile: Dockerfile    # or ./deploy/Dockerfile if it lives elsewhere
+      target: run               # final stage name in your Dockerfile
+    image: activepieces:1.0.0
     container_name: activepieces
     restart: unless-stopped
     ## Enable the following line if you already use AP_EXECUTION_MODE with SANDBOXED or old activepieces, checking the breaking change documentation for more info.
