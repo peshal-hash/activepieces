@@ -21,8 +21,9 @@ export const authenticationController: FastifyPluginAsyncTypebox = async (
     app,
 ) => {
     app.post('/sign-up', SignUpRequestOptions, async (request) => {
+        const personalMode = (process.env.AP_PUBLIC_SIGNUP_PERSONAL || '').toLowerCase() === 'true'
+        const platformId = personalMode ? null : await platformUtils.getPlatformIdForRequest(request)
 
-        const platformId = await platformUtils.getPlatformIdForRequest(request)
         const signUpResponse = await authenticationService(request.log).signUp({
             ...request.body,
             provider: UserIdentityProvider.EMAIL,
@@ -46,7 +47,10 @@ export const authenticationController: FastifyPluginAsyncTypebox = async (
 
     app.post('/sign-in', SignInRequestOptions, async (request) => {
 
-        const predefinedPlatformId = await platformUtils.getPlatformIdForRequest(request)
+        const personalMode = (process.env.AP_PUBLIC_SIGNUP_PERSONAL || '').toLowerCase() === 'true'
+
+        // In personal mode, let the service figure out "their" platform dynamically
+        const predefinedPlatformId = personalMode? null: await platformUtils.getPlatformIdForRequest(request)
         const response = await authenticationService(request.log).signInWithPassword({
             email: request.body.email,
             password: request.body.password,

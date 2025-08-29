@@ -259,13 +259,16 @@ async function getPersonalPlatformIdForFederatedAuthn(email: string, log: Fastif
 }
 
 async function getPersonalPlatformIdForIdentity(identityId: string): Promise<string | null> {
-    const edition = system.getEdition()
-    if (edition === ApEdition.CLOUD) {
-        const platforms = await platformService.listPlatformsForIdentityWithAtleastProject({ identityId })
-        const platform = platforms.find((platform) => !platformUtils.isCustomerOnDedicatedDomain(platform))
-        return platform?.id ?? null
-    }
-    return null
+  const edition = system.getEdition()
+  const personalMode = (process.env.AP_PUBLIC_SIGNUP_PERSONAL || '').toLowerCase() === 'true'
+
+  // In Cloud OR when personal mode is enabled, look up a non-dedicated platform for this identity
+  if (edition === ApEdition.CLOUD || personalMode) {
+    const platforms = await platformService.listPlatformsForIdentityWithAtleastProject({ identityId })
+    const platform = platforms.find((p) => !platformUtils.isCustomerOnDedicatedDomain(p))
+    return platform?.id ?? null
+  }
+  return null
 }
 
 

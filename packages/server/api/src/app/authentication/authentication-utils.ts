@@ -15,6 +15,13 @@ export const authenticationUtils = {
         email,
         platformId,
     }: AssertUserIsInvitedToPlatformOrProjectParams): Promise<void> {
+        const personalMode = (process.env.AP_PUBLIC_SIGNUP_PERSONAL || '').toLowerCase() === 'true'
+
+        // In personal mode, or when platformId is null (personal bootstrap), skip invitation checks
+        if (personalMode || isNil(platformId)) {
+            return
+        }
+
         const isInvited = await userInvitationsService(log).hasAnyAcceptedInvitations({
             platformId,
             email,
