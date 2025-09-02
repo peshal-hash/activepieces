@@ -11,7 +11,8 @@ services:
     ## Enable the following line if you already use AP_EXECUTION_MODE with SANDBOXED or old activepieces, checking the breaking change documentation for more info.
     ## privileged: true
     ports:
-      - '8080:80'
+      - '80:80'      # Exposes the Activepieces UI (Nginx)
+      - '5000:5000'  # Exposes your Python proxy application
     depends_on:
       - postgres
       - redis
