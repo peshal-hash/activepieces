@@ -8,6 +8,10 @@ import { domainHelper } from '../ee/custom-domains/domain-helper'
 import { system } from '../helper/system/system'
 import { FlagEntity } from './flag.entity'
 import { defaultTheme } from './theme'
+import dotenv from 'dotenv';
+
+// This line loads your environment variables from a .env file
+dotenv.config();
 
 const flagRepo = repoFactory(FlagEntity)
 
@@ -32,6 +36,7 @@ export const flagService = {
                 ApFlagId.EMAIL_AUTH_ENABLED,
                 ApFlagId.EXECUTION_DATA_RETENTION_DAYS,
                 ApFlagId.ENVIRONMENT,
+                ApFlagId.SALESOPTAIURL,
                 ApFlagId.PUBLIC_URL,
                 ApFlagId.LATEST_VERSION,
                 ApFlagId.PRIVACY_POLICY_URL,
@@ -65,6 +70,12 @@ export const flagService = {
             {
                 id: ApFlagId.ENVIRONMENT,
                 value: system.get(AppSystemProp.ENVIRONMENT),
+                created,
+                updated,
+            },
+            {
+                id: ApFlagId.SALESOPTAIURL,
+                value: system.get(AppSystemProp.SALESOPTAIURL),
                 created,
                 updated,
             },
@@ -116,7 +127,7 @@ export const flagService = {
                 created,
                 updated,
             },
-     
+
             {
                 id: ApFlagId.SHOW_BILLING,
                 value: system.getEdition() === ApEdition.CLOUD,
