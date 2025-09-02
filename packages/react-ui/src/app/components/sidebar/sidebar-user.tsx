@@ -40,7 +40,7 @@ export function SidebarUser() {
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
+            {/* <Button
               className="flex items-center ml-2"
               variant="ghost"
               size="icon"
@@ -51,7 +51,7 @@ export function SidebarUser() {
               }}
             >
               <LogOut className="size-4" />
-            </Button>
+            </Button> */}
           </TooltipTrigger>
           <TooltipContent>
             <span>{t('Logout')}</span>

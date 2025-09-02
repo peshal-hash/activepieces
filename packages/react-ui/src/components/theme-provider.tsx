@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import * as RippleHook from 'use-ripple-hook';
-
+import favicon from "@/assets/img/logo/favicon.png";
 import { flagsHooks } from '@/hooks/flags-hooks';
 import { colorsUtils } from '@/lib/color-util';
 
@@ -54,13 +54,13 @@ export function ThemeProvider({
 
     const resolvedTheme = theme === 'system' ? 'light' : theme;
     root.classList.remove('light', 'dark');
-    document.title = branding.websiteName;
+    document.title = 'SalesOptAi'; // Changed from branding.websiteName
     document.documentElement.style.setProperty(
       '--primary',
       colorsUtils.hexToHslString(branding.colors.primary.default),
     );
 
-    setFavicon(branding.logos.favIconUrl);
+    setFavicon(favicon);
     switch (resolvedTheme) {
       case 'light': {
         document.documentElement.style.setProperty(
@@ -125,3 +125,4 @@ export const useApRipple = () => {
     cancelAutomatically: true,
   });
 };
+

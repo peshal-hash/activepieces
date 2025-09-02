@@ -1,5 +1,7 @@
 import { t } from 'i18next';
+import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import apLogo from '@/assets/img/logo/ap-logo.png';
 
 import { useEmbedding } from '@/components/embed-provider';
 import { Button } from '@/components/ui/button';
@@ -15,15 +17,15 @@ import { flagsHooks } from '@/hooks/flags-hooks';
 import { cn, determineDefaultRoute } from '@/lib/utils';
 import { ApEdition, ApFlagId } from '@activepieces/shared';
 
-import ProjectSettingsDropdownMenu from './project-settings-dropdown-menu';
-
 const ApDashboardSidebarHeader = ({
   isHomeDashboard,
 }: {
   isHomeDashboard: boolean;
 }) => {
-  const branding = flagsHooks.useWebsiteBranding();
   const { data: edition } = flagsHooks.useFlag<ApEdition>(ApFlagId.EDITION);
+  // Correctly destructure the 'data' property and rename it to salesOptUrl
+  const { data: salesOptUrl } = flagsHooks.useFlag<string>(ApFlagId.SALESOPTAIURL);
+
   const { embedState } = useEmbedding();
   const isInPlatformAdmin = window.location.pathname.includes('platform');
   const showProjectSwitcher =
@@ -33,6 +35,15 @@ const ApDashboardSidebarHeader = ({
   const { checkAccess } = useAuthorization();
   const defaultRoute = determineDefaultRoute(checkAccess);
 
+  const handleBackClick = () => {
+    // Only attempt to redirect if the URL exists
+    if (salesOptUrl) {
+      window.location.href = salesOptUrl;
+    } else {
+      console.error('SalesOpt URL is not available from flags.');
+    }
+  };
+
   return (
     <SidebarHeader className="pb-0">
       <div
@@ -41,9 +52,26 @@ const ApDashboardSidebarHeader = ({
           'justify-center': embedState.hideProjectSettings,
         })}
       >
+        {isHomeDashboard && !embedState.hideProjectSettings && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBackClick}
+                // Disable the button until the URL has loaded from the backend
+                disabled={!salesOptUrl}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span className="sr-only">{t('Go back')}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{t('Go back')}</TooltipContent>
+          </Tooltip>
+        )}
         <Button
           variant="ghost"
-          className={cn({ 'w-full': !isHomeDashboard && !showProjectSwitcher })}
+          className={cn({ 'w-full': !isHomeDashboard && !showProjectSwitcher }, '-ml-1.5')}
         >
           <Link to={isHomeDashboard ? defaultRoute : '/platform'}>
             <Tooltip>
@@ -51,7 +79,7 @@ const ApDashboardSidebarHeader = ({
                 <>
                   {showProjectSwitcher && (
                     <img
-                      src={branding.logos.logoIconUrl}
+                      src={apLogo}
                       alt={t('home')}
                       className="h-5 w-5 object-contain"
                     />
@@ -59,7 +87,7 @@ const ApDashboardSidebarHeader = ({
 
                   {!showProjectSwitcher && (
                     <img
-                      src={branding.logos.fullLogoUrl}
+                      src={apLogo}
                       alt={t('home')}
                       width={160}
                       height={51}
@@ -78,10 +106,6 @@ const ApDashboardSidebarHeader = ({
             <ProjectSwitcher />
           </div>
         )}
-
-        {isHomeDashboard && !embedState.hideProjectSettings && (
-          <ProjectSettingsDropdownMenu />
-        )}
       </div>
     </SidebarHeader>
   );
@@ -90,3 +114,4 @@ const ApDashboardSidebarHeader = ({
 ApDashboardSidebarHeader.displayName = 'ApDashboardSidebarHeader';
 
 export { ApDashboardSidebarHeader };
+

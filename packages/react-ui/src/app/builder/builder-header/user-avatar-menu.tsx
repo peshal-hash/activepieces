@@ -25,38 +25,38 @@ export function UserAvatarMenu() {
   if (!user || embedState.isEmbedded) {
     return null;
   }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger>
-        <UserAvatar
-          disableTooltip={true}
-          name={user.firstName + ' ' + user.lastName}
-          email={user.email}
-          size={32}
-        ></UserAvatar>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[220px]">
-        <DropdownMenuLabel>
-          <div className="flex">
-            <div className="flex-grow flex-shrink truncate">{user.email}</div>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuItem
-          onClick={() => {
-            userHooks.invalidateCurrentUser(queryClient);
-            authenticationSession.logOut();
-            reset();
-          }}
-          className="cursor-pointer"
-        >
-          <TextWithIcon
-            icon={<LogOut size={18} className="text-destructive" />}
-            text={<span className="text-destructive">{t('Logout')}</span>}
-            className="cursor-pointer"
-          />
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  return null;
+  // return (
+  //   <DropdownMenu>
+  //     <DropdownMenuTrigger>
+  //       <UserAvatar
+  //         disableTooltip={true}
+  //         name={user.firstName + ' ' + user.lastName}
+  //         email={user.email}
+  //         size={32}
+  //       ></UserAvatar>
+  //     </DropdownMenuTrigger>
+  //     <DropdownMenuContent align="end" className="w-[220px]">
+  //       <DropdownMenuLabel>
+  //         <div className="flex">
+  //           <div className="flex-grow flex-shrink truncate">{user.email}</div>
+  //         </div>
+  //       </DropdownMenuLabel>
+  //       <DropdownMenuItem
+  //         onClick={() => {
+  //           userHooks.invalidateCurrentUser(queryClient);
+  //           authenticationSession.logOut();
+  //           reset();
+  //         }}
+  //         className="cursor-pointer"
+  //       >
+  //         <TextWithIcon
+  //           icon={<LogOut size={18} className="text-destructive" />}
+  //           text={<span className="text-destructive">{t('Logout')}</span>}
+  //           className="cursor-pointer"
+  //         />
+  //       </DropdownMenuItem>
+  //     </DropdownMenuContent>
+  //   </DropdownMenu>
+  // );
 }

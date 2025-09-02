@@ -135,7 +135,7 @@ export function DashboardContainer({ children }: DashboardContainerProps) {
 
   const items: SidebarItem[] = [
     flowsLink,
-    agentsLink,
+    // agentsLink,
     tablesLink,
     mcpLink,
     todosLink,

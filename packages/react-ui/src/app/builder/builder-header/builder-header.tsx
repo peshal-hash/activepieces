@@ -198,7 +198,7 @@ export const BuilderHeader = () => {
           )}
 
           <BuilderFlowStatusSection></BuilderFlowStatusSection>
-          <UserAvatarMenu></UserAvatarMenu>
+          {/* <UserAvatarMenu></UserAvatarMenu> */}
         </div>
       </div>
     </div>

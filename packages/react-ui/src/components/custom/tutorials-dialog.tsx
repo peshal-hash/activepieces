@@ -59,7 +59,7 @@ const TutorialsDialog = ({
     gettingStarted: {
       icon: <Star className="size-4"></Star>,
       name: t('Intro'),
-      description: t('Get started with Activepieces'),
+      description: t('Get started with SalesOptAi'),
       link: `https://www.youtube.com/embed/b97bgcOigIs?si=Zlly9_WkP1oOnJ-K`,
     },
     flows: {
@@ -160,7 +160,7 @@ const TutorialsDialog = ({
                   <TabsTrigger
                     key={key}
                     value={key}
-                    className={`flex gap-2 rounded-none bg-background h-full w-[120px] 
+                    className={`flex gap-2 rounded-none bg-background h-full w-[120px]
                             data-[state=active]:text-accent-foreground data-[state=active]:shadow-none
                             border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:active  data-[state=active]:text-primary flex items-center justify-center p-2 [&>svg]:size-5  [&>svg]:shrink-0`}
                   >

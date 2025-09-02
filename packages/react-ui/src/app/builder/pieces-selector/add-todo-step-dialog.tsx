@@ -158,7 +158,7 @@ const PreviewImage = ({ todoType }: { todoType: TodoType }) => {
     todoType === TodoType.INTERNAL ? 'Todos flow' : 'External channel flow';
   const title =
     todoType === TodoType.INTERNAL
-      ? t('Preview (Activepieces Todos)')
+      ? t('Preview (SalesOptAi Todos)')
       : t('Preview (External channel)');
   const description =
     todoType === TodoType.INTERNAL

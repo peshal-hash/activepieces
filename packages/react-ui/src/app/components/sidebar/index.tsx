@@ -225,11 +225,11 @@ export function SidebarComponent({
                     <SidebarGroup>
                       <SidebarGroupLabel>{t('Misc')}</SidebarGroupLabel>
                       <SidebarMenu>
-                        <SidebarMenuItem>
+                        {/* <SidebarMenuItem>
                           <SidebarMenuButton asChild>
                             <SidebarPlatformAdminButton />
                           </SidebarMenuButton>
-                        </SidebarMenuItem>
+                        </SidebarMenuItem> */}
                         {showConnectionsLink && (
                           <SidebarMenuItem>
                             <SidebarMenuButton asChild>
@@ -244,7 +244,7 @@ export function SidebarComponent({
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         )}
-                        {showTutorials && (
+                        {/* {showTutorials && (
                           <SidebarMenuItem>
                             <SidebarMenuButton asChild>
                               <TutorialsDialog
@@ -258,14 +258,14 @@ export function SidebarComponent({
                               </TutorialsDialog>
                             </SidebarMenuButton>
                           </SidebarMenuItem>
-                        )}
+                        )} */}
                       </SidebarMenu>
                     </SidebarGroup>
                   </div>
                 </ScrollArea>
               </div>
               <SidebarFooter className="pb-4 flex-shrink-0">
-                <SidebarMenu>
+                {/* <SidebarMenu>
                   <SidebarInviteUserButton />
                 </SidebarMenu>
                 <SidebarMenu>
@@ -276,7 +276,7 @@ export function SidebarComponent({
                     <UsageLimitsButton />
                   </SidebarMenu>
                 )}
-                <SidebarUser />
+                <SidebarUser /> */}
               </SidebarFooter>
             </SidebarContent>
           </Sidebar>
