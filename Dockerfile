@@ -7,6 +7,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update && apt-get install -y --no-install-recommends \
   openssh-client \
   python3 \
+  python3-pip \
   g++ \
   build-essential \
   git \
@@ -86,13 +87,27 @@ COPY --from=build /usr/src/app/packages /usr/src/app/packages
 # Copy the built React UI into Nginx document root
 COPY --from=build /usr/src/app/dist/packages/react-ui /usr/share/nginx/html/
 
-# Entrypoint & metadata
+# --- Add Python Application ---
+WORKDIR /usr/src/app/python-app
+COPY app.py .
+COPY src ./src
+COPY requirements.txt .
+# The line "COPY .env ." has been removed from here.
+
+# Install Python dependencies
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# --- Final Setup ---
+WORKDIR /usr/src/app
 LABEL service=activepieces
 COPY docker-entrypoint.sh .
 RUN chmod +x docker-entrypoint.sh
 ENTRYPOINT ["./docker-entrypoint.sh"]
 
+# Expose ports for Nginx (Activepieces UI) and the Python app
 EXPOSE 80
+EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
   CMD curl -fsS http://127.0.0.1/ || exit 1
+
