@@ -17,6 +17,9 @@ router = APIRouter()
 # Captured bearer token (set after /workflow, or from API responses containing {"token": ...})
 TOKEN_ = ""
 
+# The proxy's Socket.IO SID to the AP backend (used to rewrite x-ap-socket-id headers)
+BACKEND_SIO_SID = ""
+
 
 # --------------------------
 # Helpers
@@ -77,7 +80,7 @@ def token_injection_and_url_rewrite(content, content_type, token_to_inject):
     ])
 
     # Only attempt rewrites for text-ish content
-    lower_ct = content_type.lower() if content_type else ""
+    lower_ct = (content_type or "").lower()
     if ("text" in lower_ct) or ("javascript" in lower_ct) or ("json" in lower_ct) or ("html" in lower_ct):
         try:
             content_str = content.decode("utf-8")
@@ -191,7 +194,9 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
 
     @sio_client.event
     async def connect():
-        print("SIO Client: Successfully connected to Activepieces backend.")
+        global BACKEND_SIO_SID
+        BACKEND_SIO_SID = getattr(sio_client, "sid", "") or ""
+        print(f"SIO Client: Connected. Backend SID = {BACKEND_SIO_SID}")
 
     @sio_client.event
     async def disconnect():
@@ -201,7 +206,7 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
     @sio_client.on("*")
     async def catch_all(event, data):
         message = f"42{json.dumps([event, data])}"
-        print(f"  SIO MSG [Server -> Proxy]: {message[:150]}")
+        # Relay to the browser verbatim (as an event packet)
         await to_browser_queue.put(message)
 
     async def connect_socket_when_ready():
@@ -249,12 +254,16 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
         try:
             while True:
                 raw_message = await websocket.receive_text()
-                print(f"  Raw MSG [Client -> Proxy]: {raw_message[:150]}")
+                # We only translate event frames (42[<event>, <payload>]) and ping.
                 if raw_message.startswith("42"):
-                    msg = json.loads(raw_message[2:])
-                    await sio_client.emit(msg[0], msg[1] if len(msg) > 1 else None)
-                elif raw_message == "2":
-                    await to_browser_queue.put("3")
+                    try:
+                        msg = json.loads(raw_message[2:])
+                        await sio_client.emit(msg[0], msg[1] if len(msg) > 1 else None)
+                    except Exception as e:
+                        print(f"WS forward parse error: {e}")
+                elif raw_message == "2":  # ping
+                    await to_browser_queue.put("3")  # pong
+                # Other engine.io control frames (e.g., 40/41) are handled by the python client.
         except WebSocketDisconnect:
             print("Browser disconnected.")
         finally:
@@ -288,10 +297,10 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
         print("WebSocket proxy connection closed and cleaned up.")
 
 
-# 3) Generic HTTP Proxy (with token capture + early 401)
+# 3) Generic HTTP Proxy (with token capture + early 401 + socket id rewrite)
 @router.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def ap_proxy(request: Request, rest: str = ""):
-    global TOKEN_
+    global TOKEN_, BACKEND_SIO_SID
     base = (getattr(config, "AP_BASE", "") or "").rstrip("/")
     path = request.url.path
     full_url = f"{base}/{rest.lstrip('/')}"
@@ -311,6 +320,19 @@ async def ap_proxy(request: Request, rest: str = ""):
 
     if TOKEN_:
         headers["Authorization"] = f"Bearer {TOKEN_}"
+
+    # ---- Key fix: rewrite any socket-id style headers to the proxy's backend SID ----
+    # Cover common spellings just in case.
+    socket_id_headers = [
+        "x-ap-socket-id",
+        "x-socket-id",
+        "socket-id",
+        "x-client-socket-id",
+    ]
+    if BACKEND_SIO_SID:
+        for h in socket_id_headers:
+            if h in headers or path.startswith("/api/"):
+                headers[h] = BACKEND_SIO_SID
 
     try:
         body = await request.body()
