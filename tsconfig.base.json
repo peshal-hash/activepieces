@@ -17,6 +17,9 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      // This new alias points to your assets folder
+      "@/assets/*": ["packages/react-ui/src/assets/*"],
+
       "@activepieces/common-ai": [
         "packages/pieces/community/common-ai/src/index.ts"
       ],
@@ -1128,3 +1131,4 @@
   },
   "exclude": ["node_modules", "tmp"]
 }
+

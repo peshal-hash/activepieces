@@ -73,7 +73,7 @@ export const newFile = createTrigger({
       sequence_id: '0',
       etag: '0',
       sha1: '63da452d845b91ccb638510d046b902e96275359',
-      name: 'ap-logo.svg',
+      name: 'ap-logo.png',
       description: '',
       size: 877,
       path_collection: { total_count: 2, entries: [Array] },

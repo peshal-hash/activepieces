@@ -31,7 +31,7 @@ inkeepScript.addEventListener("load", function () {
       apiKey: "9b77dccb6cacb770614645da24b68c168dc213967b015a6f",
       integrationId: "clt6g42dh0008hl8duk922fjd",
       organizationId: "org_hCC6MgTLBCh3juv4",
-      primaryBrandColor: "#8143E3",
+      primaryBrandColor: "#1B76C7",
     },
     aiChatSettings: {
       chatSubjectName: "Activepieces",

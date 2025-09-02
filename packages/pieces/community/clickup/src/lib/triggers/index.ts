@@ -46,7 +46,7 @@ export const sampleTask = {
         id: 183,
         username: 'John Doe',
         email: 'john@example.com',
-        color: '#7b68ee',
+        color: '#1B76C7',
         initials: 'JD',
         profilePicture: null,
       },
@@ -87,7 +87,7 @@ export const triggers = [
             id: 55053258,
             username: 'Activepieces Apps',
             email: 'apps@activepieces.com',
-            color: '#aa2fff',
+            color: '#117eddff',
             initials: 'AA',
             profilePicture: null,
           },
@@ -121,7 +121,7 @@ export const triggers = [
             id: 55053258,
             username: 'Activepieces Apps',
             email: 'apps@activepieces.com',
-            color: '#aa2fff',
+            color: '#117eddff',
             initials: 'AA',
             profilePicture: null,
           },
@@ -167,7 +167,7 @@ export const triggers = [
             "id": 183,
             "username": "John",
             "email": "john@company.com",
-            "color": "#7b68ee",
+            "color": "#1B76C7",
             "initials": "J",
             "profilePicture": null
           },
@@ -207,7 +207,7 @@ export const triggers = [
                 "id": 183,
                 "username": "John",
                 "email": "john@company.com",
-                "color": "#7b68ee",
+                "color": "#1B76C7",
                 "initials": "J",
                 "profilePicture": null
           },
@@ -219,7 +219,7 @@ export const triggers = [
           },
           "after": {
             "status": "in progress",
-            "color": "#7C4DFF",
+            "color": "#1B76C7",
             "orderindex": 1,
             "type": "custom"
           }
@@ -250,7 +250,7 @@ export const triggers = [
             "id": 183,
             "username": "John",
             "email": "john@company.com",
-            "color": "#7b68ee",
+            "color": "#1B76C7",
             "initials": "J",
             "profilePicture": null
           },
@@ -258,7 +258,7 @@ export const triggers = [
             "id": 184,
             "username": "Sam",
             "email": "sam@company.com",
-            "color": "#7b68ee",
+            "color": "#1B76C7",
             "initials": "S",
             "profilePicture": null
           }
@@ -292,7 +292,7 @@ export const triggers = [
             "id": 183,
             "username": "John",
             "email": "john@company.com",
-            "color": "#7b68ee",
+            "color": "#1B76C7",
             "initials": "J",
             "profilePicture": null
           },
@@ -325,7 +325,7 @@ export const triggers = [
             "id": 183,
             "username": "John",
             "email": "john@company.com",
-            "color": "#7b68ee",
+            "color": "#1B76C7",
             "initials": "J",
             "profilePicture": null
           },
@@ -367,7 +367,7 @@ export const triggers = [
             "id": 183,
             "username": "John",
             "email": "john@company.com",
-            "color": "#7b68ee",
+            "color": "#1B76C7",
             "initials": "J",
             "profilePicture": null
           },
@@ -424,7 +424,7 @@ export const triggers = [
             id: 55053258,
             username: 'Activepieces Apps',
             email: 'apps@activepieces.com',
-            color: '#aa2fff',
+            color: '#117eddff',
             initials: 'AA',
             profilePicture: null,
           },
@@ -464,7 +464,7 @@ export const triggers = [
             id: 55053258,
             username: 'Activepieces Apps',
             email: 'apps@activepieces.com',
-            color: '#aa2fff',
+            color: '#117eddff',
             initials: 'AA',
             profilePicture: null,
           },
@@ -516,7 +516,7 @@ export const triggers = [
                 "id": 183,
                 "username": "John",
                 "email": "john@company.com",
-                "color": "#7b68ee",
+                "color": "#1B76C7",
                 "initials": "J",
                 "profilePicture": null
           },
@@ -552,7 +552,7 @@ export const triggers = [
                 "id": 183,
                 "username": "John",
                 "email": "john@company.com",
-                "color": "#7b68ee",
+                "color": "#1B76C7",
                 "initials": "J",
                 "profilePicture": null
           },
@@ -608,7 +608,7 @@ export const triggers = [
                 "id": 183,
                 "username": "John",
                 "email": "john@company.com",
-                "color": "#7b68ee",
+                "color": "#1B76C7",
                 "initials": "J",
                 "profilePicture": null
           },

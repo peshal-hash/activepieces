@@ -72,3 +72,34 @@ scratch.md
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+.python-version
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Local development
+.env.local
+.env.prod
+instance/
+assistants_v2/test_assistant_builder.py
+
+# User uploads
+uploads/
+*.db
+*.sqlite3
