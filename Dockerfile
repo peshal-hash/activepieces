@@ -39,8 +39,6 @@ WORKDIR /usr/src/app
 
 # Install deps
 COPY .npmrc package.json package-lock.json ./
-# use npm ci; cache npm if you like:
-# RUN --mount=type=cache,target=/root/.npm npm ci
 RUN npm ci
 
 # Copy source and build
@@ -65,8 +63,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   gettext \
   && rm -rf /var/lib/apt/lists/*
 
-# Copy configs/assets
-COPY packages/server/api/src/assets/default.cf /usr/local/etc/isolate
+# --- CHANGE IS HERE ---
+# Copy the new Nginx configuration that listens on port 5000
 COPY nginx.react.conf /etc/nginx/nginx.conf
 COPY --from=build /usr/src/app/LICENSE .
 
@@ -92,9 +90,6 @@ WORKDIR /usr/src/app/python-app
 COPY app.py .
 COPY src ./src
 COPY requirements.txt .
-# The line "COPY .env ." has been removed from here.
-
-# Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # --- Final Setup ---
@@ -104,10 +99,11 @@ COPY docker-entrypoint.sh .
 RUN chmod +x docker-entrypoint.sh
 ENTRYPOINT ["./docker-entrypoint.sh"]
 
-# Expose ports for Nginx (Activepieces UI) and the Python app
-EXPOSE 80
+# --- CHANGE IS HERE ---
+# Expose only port 5000 for the main application
 EXPOSE 5000
 
+# --- CHANGE IS HERE ---
+# Update the health check to target port 5000
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
-  CMD curl -fsS http://127.0.0.1/ || exit 1
-
+  CMD curl -fsS http://127.0.0.1:5000/ || exit 1

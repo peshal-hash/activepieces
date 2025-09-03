@@ -186,7 +186,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_BASE_URL'
-              value: 'https://${fqdn}:80'
+              value: 'http://localhost:80'
             }
             {
               name: 'AP_PROXY_URL'
