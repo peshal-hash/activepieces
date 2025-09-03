@@ -1,36 +1,24 @@
-import requests
-import re
 import asyncio
 import json
+from typing import Optional, Dict
+
+import httpx
 import socketio
+from bs4 import BeautifulSoup
 from fastapi import APIRouter, Request, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response, JSONResponse
-from bs4 import BeautifulSoup
-from typing import Optional
-from pydantic import BaseModel
-from urllib.parse import urlencode
 
-# In a real app, these would be imported from their respective modules
 from ..core import config
 from ..services import activepieces_service
 from ..database_management import db_manager
-# The following imports are based on the modular structure we discussed.
-# You would create these files to hold the corresponding logic.
-# from ..main import db_manager # Or from a dedicated services.database file
-# from ..core import config, state
-# from ..services import activepieces_service, html_rewriter
 
-# For demonstration, I am including the necessary helper classes and functions
-# that would normally be in separate files.
+router = APIRouter()
 
-from typing import Optional
-from pydantic import BaseModel
-import asyncio
-import websockets
-import json
-from typing import Dict, Optional
-import threading
-from concurrent.futures import ThreadPoolExecutor
+# -----------------------
+# Shared token management
+# -----------------------
+TOKEN_: str = ""
+_token_lock = asyncio.Lock()
 
 class WorkflowPayload(BaseModel):
     email: str
@@ -39,13 +27,14 @@ class WorkflowPayload(BaseModel):
     lastName: Optional[str] = "User"
 
 def token_injection_and_url_rewrite(content, content_type, token_to_inject):
-    # This function remains useful for rewriting URLs in the main HTML/JS files
     base_url_to_replace = config.AP_PROXY_URL
     new_base_url = config.AP_FRONTEND_URL
 
     if 'text' in content_type or 'javascript' in content_type or 'json' in content_type:
-        try: content_str = content.decode('utf-8')
-        except (UnicodeDecodeError, AttributeError): content_str = content
+        try:
+            content_str = content.decode('utf-8')
+        except (UnicodeDecodeError, AttributeError):
+            content_str = content
 
         content_str = content_str.replace(base_url_to_replace, new_base_url)
 
@@ -60,12 +49,9 @@ def token_injection_and_url_rewrite(content, content_type, token_to_inject):
         return content_str
     return content
 
-# --- Router Definition ---
-router = APIRouter()
-
-TOKEN_ = ""
-
-# --- API Endpoints ---
+# -----------------------
+# Auth bootstrap (unchanged interface)
+# -----------------------
 @router.post("/workflow")
 async def workflow(payload: WorkflowPayload):
     global TOKEN_
@@ -81,143 +67,227 @@ async def workflow(payload: WorkflowPayload):
     token = ap_data.get('token')
     if not token:
         raise HTTPException(status_code=500, detail="Failed to get token")
-    TOKEN_ = token
+
+    async with _token_lock:
+        TOKEN_ = token
+
     print(f"AUTH: Token obtained and set globally: {TOKEN_[:10]}...")
     return JSONResponse(content={'success': True, 'redirectUrl': config.AP_PROXY_URL})
-# 1. Specific Webhook Handler (HTTP/S)
 
-# 1. Specific Webhook Handler (HTTP/S)
-@router.api_route("/v1/webhooks/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+# -----------------------------------
+# 1) Specific Webhook Handler (HTTP)
+# -----------------------------------
+# Use httpx.AsyncClient to avoid blocking the event loop. Stream back the result.
+def _filtered_outgoing_headers(incoming: Dict[str, str]) -> Dict[str, str]:
+    # remove hop-by-hop headers; httpx will set length/encoding appropriately
+    hop_by_hop = {
+        'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
+        'te', 'trailers', 'transfer-encoding', 'upgrade', 'content-length',
+    }
+    return {k: v for k, v in incoming.items() if k.lower() not in hop_by_hop and k.lower() != 'host'}
+
+@router.api_route("/v1/webhooks/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def v1_webhook_handler(request: Request, rest_of_path: str):
     print("\n✅ --- HTTP Webhook Intercepted! --- ✅")
-    body = await request.body()
-    print(f"PATH: /v1/webhooks/{rest_of_path}, METHOD: {request.method}")
-    print("FORWARDING to backend...")
+    full_url = f"{config.AP_BASE.rstrip('/')}/v1/webhooks/{rest_of_path}"
 
-    full_url = f"{config.AP_BASE}/v1/webhooks/{rest_of_path}"
-    headers_to_forward = {k: v for k, v in request.headers.items() if k.lower() not in ['host']}
+    # Build outbound headers
+    headers = _filtered_outgoing_headers(dict(request.headers))
+    headers.setdefault('X-Forwarded-Proto', request.url.scheme)
+    headers.setdefault('X-Forwarded-Host', request.headers.get('host', ''))
+    headers.setdefault('X-Forwarded-For', request.client.host if request.client else '')
+
+    # Read body once
+    body = await request.body()
 
     try:
-        resp = requests.request(
-            method=request.method, url=full_url, headers=headers_to_forward,
-            params=request.query_params, data=body, timeout=config.TIMEOUT
-        )
-        print(f"BACKEND RESPONSE: Status {resp.status_code}")
-        excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
-        response_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
-        return Response(content=resp.content, status_code=resp.status_code, headers=response_headers)
-    except requests.exceptions.RequestException as e:
+        async with httpx.AsyncClient(timeout=config.TIMEOUT, follow_redirects=False) as client:
+            resp = await client.request(
+                method=request.method,
+                url=full_url,
+                headers=headers,
+                params=dict(request.query_params),
+                content=body,
+            )
+    except httpx.RequestError as e:
         return Response(content=f"Proxy connection error on webhook: {e}", status_code=502)
 
-# 2. WebSocket Proxy
+    # Prepare response to client
+    excluded = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
+    out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
+    return Response(content=resp.content, status_code=resp.status_code, headers=out_headers)
+
+# -------------------------
+# 2) WebSocket / Socket.IO
+# -------------------------
 @router.websocket("/{rest:path}")
 async def websocket_proxy(websocket: WebSocket, rest: str):
     await websocket.accept()
-    # A new, isolated client is created for every browser connection.
-    sio_client = socketio.AsyncClient()
-    to_browser_queue = asyncio.Queue()
 
+    # Local snapshot of token to avoid races
+    async with _token_lock:
+        auth_token = TOKEN_
+
+    sio_client = socketio.AsyncClient(reconnection=True)
+    to_browser_queue: asyncio.Queue[str] = asyncio.Queue()
+
+    # --- Helpers to send frames to browser
+    async def send_to_browser(text: str):
+        try:
+            await websocket.send_text(text)
+        except RuntimeError:
+            # connection likely closed
+            pass
+
+    # --- Backend event handlers
     @sio_client.event
     async def connect():
-        print("SIO Client: Successfully connected to Activepieces backend.")
+        print("SIO Client: connected to backend.")
+        # Send Socket.IO "open" packet to the browser
+        # Browser expects '40' after a successful connect
+        await send_to_browser('40')
+
     @sio_client.event
     async def disconnect():
-        print("SIO Client: Disconnected from Activepieces backend.")
-        await to_browser_queue.put(None)
-    @sio_client.on('*')
-    async def catch_all(event, data):
-        message = f'42{json.dumps([event, data])}'
-        print(f"  SIO MSG [Server -> Proxy]: {message[:150]}")
-        await to_browser_queue.put(message)
+        print("SIO Client: disconnected from backend.")
+        await to_browser_queue.put('__CLOSE__')
 
+    # Wildcard handling: use native if available, otherwise shim with on_any_event
+    if hasattr(sio_client, 'on') and callable(getattr(sio_client, 'on')):
+        try:
+            @sio_client.on('*')  # works on recent python-socketio
+            async def _any(event, data):
+                # Frame as a Socket.IO message ('42' + JSON array [event, data])
+                pkt = f'42{json.dumps([event, data], separators=(",", ":"))}'
+                await to_browser_queue.put(pkt)
+        except TypeError:
+            # Fallback for older versions: register a generic handler
+            async def on_any_event(event, *args):
+                data = args[0] if args else None
+                pkt = f'42{json.dumps([event, data], separators=(",", ":"))}'
+                await to_browser_queue.put(pkt)
+            sio_client.on('*', handler=on_any_event)
+
+    # Connect to backend
     try:
-        # The captured token is sent in the 'auth' object, as required by the backend.
-        auth_payload = {'token': TOKEN_} if TOKEN_ else None
-        print(f"SIO Client: Attempting to connect to backend at {config.AP_BASE} with token {'YES' if TOKEN_ else 'NO'}")
+        backend_url = config.AP_BASE  # must include scheme, e.g. "https://host"
+        auth_payload = {'token': auth_token} if auth_token else None
+        print(f"SIO Client: connecting to {backend_url} (token={bool(auth_token)})")
 
         await sio_client.connect(
-            config.AP_BASE,
+            backend_url,
             auth=auth_payload,
             socketio_path="/api/socket.io",
-            transports=['websocket'] # Force WebSocket transport as required by backend
+            transports=['websocket'],
         )
-
-        async def forward_to_backend():
-            try:
-                while True:
-                    raw_message = await websocket.receive_text()
-                    print(f"  Raw MSG [Client -> Proxy]: {raw_message[:150]}")
-                    if raw_message.startswith('42'): # Standard Socket.IO message
-                        msg = json.loads(raw_message[2:])
-                        await sio_client.emit(msg[0], msg[1] if len(msg) > 1 else None)
-                    elif raw_message == '2': # Ping from browser
-                        await to_browser_queue.put('3') # Respond with Pong
-            except WebSocketDisconnect:
-                print("Browser disconnected.")
-            finally:
-                await to_browser_queue.put(None)
-
-        async def forward_to_browser():
-            while True:
-                message = await to_browser_queue.get()
-                if message is None: break
-                await websocket.send_text(message)
-
-        # Run both forwarders concurrently until one closes the connection
-        done, pending = await asyncio.wait(
-            [forward_to_backend(), forward_to_browser()],
-            return_when=asyncio.FIRST_COMPLETED
-        )
-        for task in pending: task.cancel()
-
-    except socketio.exceptions.ConnectionError as e:
-        print(f"SIO Client Connection Error: {e}")
     except Exception as e:
-        print(f"WebSocket proxy error: {e}")
+        print(f"SIO connect error: {e}")
+        await websocket.close(code=4403)
+        return
+
+    async def forward_to_backend():
+        try:
+            while True:
+                msg = await websocket.receive()
+                if 'text' in msg and msg['text'] is not None:
+                    raw = msg['text']
+
+                    # Engine.IO ping from browser
+                    if raw == '2':
+                        # reply with pong directly (Engine.IO)
+                        await send_to_browser('3')
+                        continue
+
+                    # Socket.IO event frame
+                    if raw.startswith('42'):
+                        try:
+                            arr = json.loads(raw[2:])
+                            event = arr[0]
+                            data = arr[1] if len(arr) > 1 else None
+                            await sio_client.emit(event, data)
+                        except Exception as e:
+                            print(f"Parse/emit error: {e}")
+                            continue
+
+                    # Ignore other control frames from browser ('40' etc.) – we originate those
+                elif 'bytes' in msg and msg['bytes'] is not None:
+                    # If your frontend uses binary packets, you could forward via sio_client.emit with binary=True
+                    # For now, ignore to avoid protocol drift.
+                    pass
+        except WebSocketDisconnect:
+            print("Browser disconnected.")
+        finally:
+            await to_browser_queue.put('__CLOSE__')
+
+    async def forward_to_browser():
+        while True:
+            pkt = await to_browser_queue.get()
+            if pkt == '__CLOSE__':
+                break
+            await send_to_browser(pkt)
+
+    # Run both directions until one ends
+    task_backend = asyncio.create_task(forward_to_backend())
+    task_browser = asyncio.create_task(forward_to_browser())
+    try:
+        await asyncio.wait({task_backend, task_browser}, return_when=asyncio.FIRST_COMPLETED)
     finally:
+        task_backend.cancel()
+        task_browser.cancel()
         if sio_client.connected:
             await sio_client.disconnect()
-        # This check is now corrected to properly inspect the connection state.
         if websocket.client_state.name != 'DISCONNECTED':
             await websocket.close()
-        print("WebSocket proxy connection closed and cleaned up.")
+        print("WebSocket proxy connection closed.")
 
-# 3. Generic HTTP Proxy (Catch-All) with Token Interception
+# ---------------------------------------------------------
+# 3) Generic HTTP Proxy (Catch-All) with Token Interception
+# ---------------------------------------------------------
 @router.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def ap_proxy(request: Request, rest: str = ""):
     global TOKEN_
-    full_url = f"{config.AP_BASE}/{rest}"
-    headers = {k: v for k, v in request.headers.items() if k.lower() not in ['host']}
+    full_url = f"{config.AP_BASE.rstrip('/')}/{rest}"
+    incoming_headers = dict(request.headers)
+    headers = _filtered_outgoing_headers(incoming_headers)
+    headers.setdefault('X-Forwarded-Proto', request.url.scheme)
+    headers.setdefault('X-Forwarded-Host', incoming_headers.get('host', ''))
+    headers.setdefault('X-Forwarded-For', request.client.host if request.client else '')
 
-    if TOKEN_:
-        headers['Authorization'] = f"Bearer {TOKEN_}"
+    # Auth header injection from captured token
+    async with _token_lock:
+        if TOKEN_:
+            headers['Authorization'] = f"Bearer {TOKEN_}"
+
+    body = await request.body()
 
     try:
-        body = await request.body()
-        resp = requests.request(
-            method=request.method, url=full_url, headers=headers, data=body,
-            cookies=request.cookies, params=request.query_params,
-            allow_redirects=False, timeout=config.TIMEOUT
-        )
-    except requests.exceptions.RequestException as e:
+        async with httpx.AsyncClient(timeout=config.TIMEOUT, follow_redirects=False) as client:
+            resp = await client.request(
+                method=request.method,
+                url=full_url,
+                headers=headers,
+                params=dict(request.query_params),
+                content=body,
+                cookies=request.cookies
+            )
+    except httpx.RequestError as e:
         return Response(content=f"Proxy connection error: {e}", status_code=502)
 
-    # ** THE FIX IS HERE: More aggressive token capture **
-    # Inspect every successful JSON response for a token.
+    # Token capture (if backend returns JSON with 'token')
     content_type = resp.headers.get('Content-Type', '')
     if resp.status_code == 200 and 'application/json' in content_type:
         try:
             data = resp.json()
-            if 'token' in data and isinstance(data['token'], str):
+            if isinstance(data, dict) and isinstance(data.get('token'), str):
                 new_token = data['token']
-                if TOKEN_ != new_token:
-                    TOKEN_ = new_token
-                    print(f"AUTH: Real token CAPTURED from '{rest}': {TOKEN_[:10]}...")
+                async with _token_lock:
+                    if TOKEN_ != new_token:
+                        TOKEN_ = new_token
+                        print(f"AUTH: Real token CAPTURED from '{rest}': {TOKEN_[:10]}...")
         except json.JSONDecodeError:
-            pass # Response was not valid JSON, ignore.
+            pass
 
     rewritten_content = token_injection_and_url_rewrite(resp.content, content_type, TOKEN_)
-    excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
-    response_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers}
-    return Response(content=rewritten_content, status_code=resp.status_code, headers=response_headers)
-
+    excluded = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
+    out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
+    return Response(content=rewritten_content, status_code=resp.status_code, headers=out_headers)

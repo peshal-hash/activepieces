@@ -64,7 +64,7 @@ resource redisCache 'Microsoft.Cache/redis@2023-08-01' = if (deployNewInfrastruc
   name: redisCacheName
   location: location
   sku: {
-    name: 'Basic'
+    name: 'Basic_C0'
     family: 'C'
     capacity: 0
   }
