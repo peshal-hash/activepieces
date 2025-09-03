@@ -1,6 +1,6 @@
 // Bicep template for deploying Activepieces with Postgres and Redis
 // --- PARAMETERS ---
-param location string // <-- MODIFY THIS LINE
+param location string
 param environmentName string = 'testContainerEnvironment'
 param acrName string = 'salesopttest'
 param appImageTag string = 'latest'
@@ -11,7 +11,6 @@ param postgresAdminUser string
 param redisCacheName string
 param deployNewInfrastructure bool = true
 
-// FIX: The @secure() decorator must be on the line before the parameter.
 @secure()
 param postgresAdminPassword string
 
@@ -63,12 +62,14 @@ resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2
 resource redisCache 'Microsoft.Cache/redis@2023-08-01' = if (deployNewInfrastructure) {
   name: redisCacheName
   location: location
-  sku: {
-    name: 'Basic_C0'
-    family: 'C'
-    capacity: 0
-  }
+  // The 'sku' object has been moved from here...
   properties: {
+    // ...to inside the 'properties' block.
+    sku: {
+      name: 'Basic_C0'
+      family: 'C'
+      capacity: 0
+    }
     enableNonSslPort: false
     minimumTlsVersion: '1.2'
   }
