@@ -102,7 +102,7 @@ async def workflow(payload: WorkflowPayload):
         key="ap_token",
         value=token,
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="Lax",
         max_age=60 * 60,
     )
@@ -153,7 +153,13 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
     cookie_token = websocket.cookies.get("ap_token")
     async with _token_lock:
         global_token = TOKEN_
-    auth_token = cookie_token or global_token
+    header_token = None
+    auth_header = websocket.headers.get("Authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        header_token = auth_header.split(" ", 1)[1].strip()
+
+    auth_token = cookie_token or global_token or header_token
+
 
     sio_client = socketio.AsyncClient(reconnection=True)
     to_browser_queue: asyncio.Queue[str] = asyncio.Queue()

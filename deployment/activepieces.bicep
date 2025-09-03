@@ -31,7 +31,7 @@ resource environment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
   name: environmentName
 }
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
-  name: 'salesopt-ap-container-identity'
+  name: 'salesopt-container-identity'
 }
 
 // --- INFRASTRUCTURE (CONDITIONAL CREATION) ---
@@ -105,7 +105,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
       activeRevisionsMode: 'Single'
       ingress: {
         external: true
-        targetPort: 80
+        targetPort: 5000
         transport: 'auto'
       }
       registries: [
@@ -152,15 +152,15 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_FRONTEND_URL'
-              value: 'https://${fqdn}'
+              value: 'https://${fqdn}:80'
             }
             {
               name: 'AP_BASE'
-              value: 'https://${fqdn}'
+              value: 'https://${fqdn}:80'
             }
             {
               name: 'AP_PROXY_URL'
-              value: 'http://${fqdn}:5000'
+              value: 'http://${fqdn}'
             }
             {
               name: 'AP_WEBHOOK_TIMEOUT_SECONDS'
