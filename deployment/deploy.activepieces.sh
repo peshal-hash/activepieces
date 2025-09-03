@@ -36,6 +36,7 @@ GIT_SHA=${GITHUB_SHA:-$(git rev-parse --short HEAD)}
 GIT_SHA_SHORT=$(echo "${GIT_SHA}" | cut -c1-7)
 IMAGE_TAG="${GIT_SHA_SHORT}-${BUILD_TIMESTAMP}"
 REVISION_SUFFIX="${GIT_SHA_SHORT}-${BUILD_TIMESTAMP}"
+DEPLOYMENT_NAME="ap-deploy-${REVISION_SUFFIX}"
 
 # --- Logging ---
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -80,7 +81,10 @@ function deploy_infrastructure() {
 
     local DEPLOY_NEW_INFRA='true'
 
-    az deployment group create \
+    # 1. Run the deployment and wait for it to finish.
+    #    The 'if !' structure ensures that if the command fails, the script exits due to 'set -e'.
+    if ! az deployment group create \
+      --name "$DEPLOYMENT_NAME" \
       --resource-group "$RESOURCE_GROUP" \
       --template-file "$BICEP_FILE" \
       --parameters \
@@ -95,14 +99,26 @@ function deploy_infrastructure() {
         postgresAdminPassword="$POSTGRES_PASSWORD" \
         apiKey="$API_KEY" \
         encryptionKey="$ENCRYPTION_KEY" \
-        jwtSecret="$JWT_SECRET" \
+        jwtSecret="$JWT_SECRET"; then
+        write_error "Bicep deployment failed."
+        exit 1
+    fi
+
+    write_success "Bicep deployment completed."
+    write_info "Fetching deployment outputs..."
+
+    # 2. Safely retrieve the output from the completed deployment.
+    az deployment group show \
+      --name "$DEPLOYMENT_NAME" \
+      --resource-group "$RESOURCE_GROUP" \
       --query "properties.outputs.appUrl.value" \
       -o tsv
 }
 
 function health_check() {
   local app_url=$1
-  local health_endpoint="${app_url}/"
+  # The Bicep output is now just the FQDN, so we add the protocol here.
+  local health_endpoint="https://${app_url}/"
   write_info "Performing health check on $health_endpoint..."
   for i in {1..20}; do
     if curl --fail -s -o /dev/null "$health_endpoint"; then
@@ -139,12 +155,15 @@ function main() {
 
   health_check "$app_fqdn"
 
+  local full_app_url="https://${app_fqdn}"
+
   echo "" >&2
   write_success "=== ${ENVIRONMENT_NAME} DEPLOYMENT COMPLETED ==="
-  write_success "Application URL: $app_fqdn"
+  write_success "Application URL: $full_app_url"
   write_success "Image Tag: $IMAGE_TAG"
 
-  echo "https://$app_fqdn"
+  # Final output for the GitHub Actions step
+  echo "$full_app_url"
 }
 
 main
