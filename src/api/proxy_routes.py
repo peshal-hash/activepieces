@@ -52,8 +52,8 @@ def token_injection_and_url_rewrite(content, content_type: str, _token_to_inject
     Only do safe URL rewriting. We avoid injecting tokens into HTML for security.
     Rewrites upstream origin references to the proxy origin so the app keeps calling us.
     """
-    upstream_origin = config.AP_BASE  # e.g., https://upstream.example.com
-    proxy_origin = config.AP_PROXY_URL  # e.g., https://proxy.example.com
+    upstream_origin = config.AP_BASE            # e.g., https://upstream.example.com
+    proxy_origin = config.AP_PROXY_URL          # e.g., https://proxy.example.com
 
     if "text" in content_type or "javascript" in content_type or "json" in content_type:
         try:
@@ -65,7 +65,6 @@ def token_injection_and_url_rewrite(content, content_type: str, _token_to_inject
         if isinstance(content_str, str) and upstream_origin and proxy_origin:
             content_str = content_str.replace(upstream_origin.rstrip("/"), proxy_origin.rstrip("/"))
 
-        # No localStorage token injection (use HttpOnly cookie instead)
         return content_str
     return content
 
@@ -77,7 +76,6 @@ def token_injection_and_url_rewrite(content, content_type: str, _token_to_inject
 async def workflow(payload: WorkflowPayload):
     global TOKEN_
     try:
-        # These are sync functions; run off the event loop thread.
         ap_data = await asyncio.to_thread(activepieces_service.sign_in, payload.email, payload.password)
     except requests.HTTPError:
         try:
@@ -105,8 +103,8 @@ async def workflow(payload: WorkflowPayload):
         value=token,
         httponly=True,
         secure=True,
-        samesite="Lax",  # 'Strict' can break some flows during redirects
-        max_age=60 * 60,  # 1 hour (adjust as needed)
+        samesite="Lax",
+        max_age=60 * 60,
     )
     return resp
 
@@ -259,6 +257,8 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
 # =========================================================
 @router.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def ap_proxy(request: Request, rest: str = ""):
+    global TOKEN_  # <-- IMPORTANT: declare global since we may assign below
+
     # Build upstream URL robustly
     base = config.AP_BASE.rstrip("/")
     full_url = f"{base}/{rest.lstrip('/')}"
@@ -270,7 +270,7 @@ async def ap_proxy(request: Request, rest: str = ""):
     headers.setdefault("X-Forwarded-Host", incoming.get("host", ""))
     headers.setdefault("X-Forwarded-For", request.client.host if request.client else "")
 
-    # Prefer cookie token; fall back to global
+    # Prefer cookie token; fall back to global (read under lock)
     cookie_token = request.cookies.get("ap_token")
     async with _token_lock:
         global_token = TOKEN_
@@ -307,7 +307,7 @@ async def ap_proxy(request: Request, rest: str = ""):
     except requests.exceptions.RequestException as e:
         return Response(content=f"Proxy connection error: {e}", status_code=502)
 
-    # Capture token if upstream returns it in JSON
+    # Capture token if upstream returns it in JSON (write under lock)
     content_type = resp.headers.get("Content-Type", "")
     if resp.status_code == 200 and "application/json" in content_type:
         try:
