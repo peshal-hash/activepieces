@@ -1,20 +1,23 @@
 // Bicep template for deploying Activepieces with Postgres and Redis
 // --- PARAMETERS ---
-// These values are passed in from your deploy.activepieces.sh script
 param location string = resourceGroup().location
 param environmentName string = 'testContainerEnvironment'
 param keyVaultName string = 'salesopt-kv-test'
 param acrName string = 'salesopttest'
 param appImageTag string = 'latest'
 param revisionSuffix string = ''
-// These parameters are passed from the deployment script
 param containerAppName string
 param postgresServerName string
 param postgresAdminUser string
 param redisCacheName string
+param deployNewInfrastructure bool = true
+
+// This password is now passed securely from the deployment script
+param postgresAdminPassword string {
+@secure()
+}
 
 // --- EXISTING RESOURCES ---
-// References to resources that are already deployed and configured
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
 }
@@ -28,89 +31,96 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-
   name: 'salesopt-ap-container-identity'
 }
 
-// --- IDEMPOTENT SECRET CREATION ---
-// These resources create secrets only if they don't already exist in the Key Vault.
-resource postgresAdminPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+// --- SECRETS (REFERENCED ONLY) ---
+// The deployment script now ensures these secrets exist. Bicep only needs to reference them.
+resource existingPostgresUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
   parent: keyVault
-  name: 'postgres-server-admin-password'
-  properties: {
-    value: newGuid()
-  }
+  name: 'POSTGRES-CONNECTION-STRING'
 }
-resource existingPostgresPassword 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
+resource existingRedisUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
   parent: keyVault
-  name: postgresAdminPasswordSecret.name
+  name: 'REDIS-CONNECTION-STRING'
 }
-resource apEncryptionKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource existingApEncryptionKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
   parent: keyVault
   name: 'AP-ENCRYPTION-KEY'
-  properties: {
-    value: newGuid()
-  }
 }
-resource apJwtSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource existingApJwtSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
   parent: keyVault
   name: 'AP-JWT-SECRET'
-  properties: {
-    value: newGuid()
-  }
 }
-resource apApiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource existingApApiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
   parent: keyVault
   name: 'AP-API-KEY'
-  properties: {
-    value: newGuid()
-  }
 }
 
-// --- NEW INFRASTRUCTURE ---
-// These resources will be created by the Bicep template.
-resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' = {
+// --- INFRASTRUCTURE (CONDITIONAL CREATION) ---
+resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' = if (deployNewInfrastructure) {
   name: postgresServerName
   location: location
-  sku: { name: 'Standard_B1ms', tier: 'Burstable' }
+  sku: {
+    name: 'Standard_B1ms'
+    tier: 'Burstable'
+  }
   properties: {
     administratorLogin: postgresAdminUser
-    administratorLoginPassword: existingPostgresPassword.getSecret().value
+    administratorLoginPassword: postgresAdminPassword
     version: '14'
-    storage: { storageSizeGB: 32 }
-    backup: { backupRetentionDays: 7, geoRedundantBackup: 'Disabled' }
-    network: { publicNetworkAccess: 'Enabled' }
+    storage: {
+      storageSizeGB: 32
+    }
+    backup: {
+      backupRetentionDays: 7
+      geoRedundantBackup: 'Disabled'
+    }
   }
 }
-resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-03-01-preview' = {
+resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-03-01-preview' = if (deployNewInfrastructure) {
   parent: postgresServer
   name: 'activepieces'
 }
-resource redisCache 'Microsoft.Cache/redis@2023-08-01' = {
+resource redisCache 'Microsoft.Cache/redis@2023-08-01' = if (deployNewInfrastructure) {
   name: redisCacheName
   location: location
-  sku: { name: 'Basic', family: 'C', capacity: 0 }
+  sku: {
+    name: 'Basic'
+    family: 'C'
+    capacity: 0
+  }
   properties: {
     enableNonSslPort: false
     minimumTlsVersion: '1.2'
   }
 }
 
-// --- CONNECTION STRINGS ---
-// These secrets store the full connection URLs, which the application will use.
-var postgresConnectionString = 'postgres://${postgresAdminUser}:${existingPostgresPassword.getSecret().value}@${postgresServer.properties.fullyQualifiedDomainName}:5432/${postgresDatabase.name}'
-var redisConnectionString = 'redis://:${redisCache.listKeys().primaryKey}@${redisCache.properties.hostName}:${redisCache.properties.sslPort}'
+// Unconditional reference for connection string construction
+resource existingPostgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' existing = {
+  name: postgresServerName
+}
+resource existingRedisCache 'Microsoft.Cache/redis@2023-08-01' existing = {
+  name: redisCacheName
+}
 
-resource postgresUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+// --- CONNECTION STRINGS (Created if infrastructure is new) ---
+var postgresConnectionString = 'postgres://${postgresAdminUser}:${postgresAdminPassword}@${existingPostgresServer.properties.fullyQualifiedDomainName}:5432/activepieces'
+var redisConnectionString = 'redis://:${existingRedisCache.listKeys().primaryKey}@${existingRedisCache.properties.hostName}:${existingRedisCache.properties.sslPort}'
+
+resource postgresUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (deployNewInfrastructure) {
   parent: keyVault
   name: 'POSTGRES-CONNECTION-STRING'
   properties: {
     value: postgresConnectionString
   }
 }
-resource redisUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource redisUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (deployNewInfrastructure) {
   parent: keyVault
   name: 'REDIS-CONNECTION-STRING'
   properties: {
     value: redisConnectionString
   }
 }
+
+var fqdn = '${containerAppName}.${environment.properties.defaultDomain}'
 
 // --- CONTAINER APP DEPLOYMENT ---
 resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
@@ -126,19 +136,11 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
     managedEnvironmentId: environment.id
     configuration: {
       activeRevisionsMode: 'Single'
-      ingress: [
-        {
-          external: true
-          targetPort: 80
-          transport: 'auto'
-          isMainEntryPoint: true
-        }
-        {
-          external: true
-          targetPort: 5000
-          transport: 'auto'
-        }
-      ]
+      ingress: {
+        external: true
+        targetPort: 80
+        transport: 'auto'
+      }
       registries: [
         {
           server: acr.properties.loginServer
@@ -148,21 +150,29 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
       secrets: [
         {
           name: 'postgres-connection-string'
-          keyVaultUrl: postgresUrlSecret.properties.secretUri
+          keyVaultUrl: existingPostgresUrlSecret.properties.secretUri
           identity: managedIdentity.id
         }
         {
           name: 'redis-connection-string'
-          keyVaultUrl: redisUrlSecret.properties.secretUri
+          keyVaultUrl: existingRedisUrlSecret.properties.secretUri
           identity: managedIdentity.id
         }
         {
           name: 'ap-encryption-key'
-          keyVaultUrl: apEncryptionKeySecret.properties.secretUri
+          keyVaultUrl: existingApEncryptionKeySecret.properties.secretUri
           identity: managedIdentity.id
         }
-        { name: 'ap-jwt-secret', keyVaultUrl: apJwtSecret.properties.secretUri, identity: managedIdentity.id }
-        { name: 'ap-api-key', keyVaultUrl: apApiKeySecret.properties.secretUri, identity: managedIdentity.id }
+        {
+          name: 'ap-jwt-secret'
+          keyVaultUrl: existingApJwtSecret.properties.secretUri
+          identity: managedIdentity.id
+        }
+        {
+          name: 'ap-api-key'
+          keyVaultUrl: existingApApiKeySecret.properties.secretUri
+          identity: managedIdentity.id
+        }
       ]
     }
     template: {
@@ -171,26 +181,83 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
         {
           image: '${acr.properties.loginServer}/${containerAppName}:${appImageTag}'
           name: 'main-app'
-          resources: { cpu: json('0.5'), memory: '1.0Gi' }
+          resources: {
+            cpu: json('0.5')
+            memory: '1.0Gi'
+          }
           env: [
-            { name: 'AP_ENVIRONMENT', value: 'prod' }
-            { name: 'AP_API_KEY', secretRef: 'ap-api-key' }
-            { name: 'AP_ENCRYPTION_KEY', secretRef: 'ap-encryption-key' }
-            { name: 'AP_JWT_SECRET', secretRef: 'ap-jwt-secret' }
-            { name: 'AP_POSTGRES_URL', secretRef: 'postgres-connection-string' }
-            { name: 'AP_REDIS_URL', secretRef: 'redis-connection-string' }
-            { name: 'AP_FRONTEND_URL', value: 'https://${containerApp.properties.configuration.ingress[0].fqdn}' }
-            { name: 'AP_PROXY_URL', value: 'http://${containerApp.properties.configuration.ingress[0].fqdn}:5000' }
-            { name: 'AP_BASE', value: 'https://${containerApp.properties.configuration.ingress[0].fqdn}' }
-            { name: 'AP_WEBHOOK_TIMEOUT_SECONDS', value: '30' }
-            { name: 'AP_TRIGGER_DEFAULT_POLL_INTERVAL', value: '5' }
-            { name: 'AP_EXECUTION_MODE', value: 'UNSANDBOXED' }
-            { name: 'AP_FLOW_TIMEOUT_SECONDS', value: '600' }
-            { name: 'AP_TELEMETRY_ENABLED', value: 'true' }
-            { name: 'AP_TEMPLATES_SOURCE_URL', value: '' }
-            { name: 'AP_PUBLIC_SIGNUP_PERSONAL', value: 'true' }
-            { name: 'AP_SALESOPTAIURL', value: 'http://localhost:3000' }
-            { name: 'AP_WEBSITE_NAME', value: 'SalesOptAi' }
+            {
+              name: 'AP_ENVIRONMENT'
+              value: 'prod'
+            }
+            {
+              name: 'AP_API_KEY'
+              secretRef: 'ap-api-key'
+            }
+            {
+              name: 'AP_ENCRYPTION_KEY'
+              secretRef: 'ap-encryption-key'
+            }
+            {
+              name: 'AP_JWT_SECRET'
+              secretRef: 'ap-jwt-secret'
+            }
+            {
+              name: 'AP_POSTGRES_URL'
+              secretRef: 'postgres-connection-string'
+            }
+            {
+              name: 'AP_REDIS_URL'
+              secretRef: 'redis-connection-string'
+            }
+            {
+              name: 'AP_FRONTEND_URL'
+              value: 'https://${fqdn}'
+            }
+            {
+              name: 'AP_BASE'
+              value: 'https://${fqdn}'
+            }
+            {
+              name: 'AP_PROXY_URL'
+              value: 'http://${fqdn}:5000'
+            }
+            {
+              name: 'AP_WEBHOOK_TIMEOUT_SECONDS'
+              value: '30'
+            }
+            {
+              name: 'AP_TRIGGER_DEFAULT_POLL_INTERVAL'
+              value: '5'
+            }
+            {
+              name: 'AP_EXECUTION_MODE'
+              value: 'UNSANDBOXED'
+            }
+            {
+              name: 'AP_FLOW_TIMEOUT_SECONDS'
+              value: '600'
+            }
+            {
+              name: 'AP_TELEMETRY_ENABLED'
+              value: 'true'
+            }
+            {
+              name: 'AP_TEMPLATES_SOURCE_URL'
+              value: ''
+            }
+            {
+              name: 'AP_PUBLIC_SIGNUP_PERSONAL'
+              value: 'true'
+            }
+            {
+              name: 'AP_SALESOPTAIURL'
+              value: 'http://localhost:3000'
+            }
+            {
+              name: 'AP_WEBSITE_NAME'
+              value: 'SalesOptAi'
+            }
           ]
         }
       ]
@@ -200,7 +267,11 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
         rules: [
           {
             name: 'http-scaling'
-            http: { metadata: { concurrentRequests: '100' } }
+            http: {
+              metadata: {
+                concurrentRequests: '100'
+              }
+            }
           }
         ]
       }
@@ -209,5 +280,4 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
 }
 
 // --- OUTPUTS ---
-// This output is used by the deployment script to perform a health check.
-output appUrl string = containerApp.properties.configuration.ingress[0].fqdn
+output appUrl string = fqdn

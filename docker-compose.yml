@@ -2,30 +2,45 @@ version: '3.0'
 services:
   activepieces:
     build:
-      context: .                # folder containing the Dockerfile
-      dockerfile: Dockerfile    # or ./deploy/Dockerfile if it lives elsewhere
-      target: run               # final stage name in your Dockerfile
+      context: /home/peshal/SalesOpt/activepieces
+      dockerfile: Dockerfile
+      target: run
     image: activepieces:1.0.0
     container_name: activepieces
     restart: unless-stopped
-    ## Enable the following line if you already use AP_EXECUTION_MODE with SANDBOXED or old activepieces, checking the breaking change documentation for more info.
-    ## privileged: true
     ports:
-      - '80:80'      # Exposes the Activepieces UI (Nginx)
-      - '5000:5000'  # Exposes your Python proxy application
+      - "80:80"       # UI
+      - "5000:5000"   # Python proxy
     depends_on:
       - postgres
       - redis
-    env_file: .env
+    env_file: /home/peshal/SalesOpt/activepieces/.env
+    working_dir: /usr/src/app
     volumes:
-      - ./cache:/usr/src/app/cache
+      - /home/peshal/SalesOpt/activepieces:/usr/src/app
+      - /usr/src/app/node_modules
+      - /home/peshal/SalesOpt/activepieces/cache:/usr/src/app/cache
+    environment:
+      - PYTHONPATH=/usr/src/app:/usr/src/app/src
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=200
+    entrypoint: ["/bin/sh","-lc",
+      "set -e; \
+       if command -v pip >/dev/null 2>&1 && [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi; \
+       echo 'Starting Python proxy on :5000 (reload)…'; \
+       ( python -m uvicorn src.main:app --host 0.0.0.0 --port 5000 --reload ) & \
+       if [ -f package.json ]; then npm install || true; echo 'Starting Node app…'; exec npm run dev; fi; \
+       echo 'No package.json; keeping container alive'; tail -f /dev/null"
+    ]
+
     networks:
       - activepieces
+
   postgres:
     image: 'postgres:14.4'
     container_name: postgres
     restart: unless-stopped
-    env_file: .env
+    env_file: /home/peshal/SalesOpt/activepieces/.env
     environment:
       - 'POSTGRES_DB=${AP_POSTGRES_DATABASE}'
       - 'POSTGRES_PASSWORD=${AP_POSTGRES_PASSWORD}'
@@ -34,6 +49,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - activepieces
+
   redis:
     image: 'redis:7.0.7'
     container_name: redis
@@ -42,8 +58,10 @@ services:
       - 'redis_data:/data'
     networks:
       - activepieces
+
 volumes:
   postgres_data:
   redis_data:
+
 networks:
   activepieces:
