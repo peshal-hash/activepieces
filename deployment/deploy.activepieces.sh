@@ -84,6 +84,7 @@ function deploy_infrastructure() {
       --resource-group "$RESOURCE_GROUP" \
       --template-file "$BICEP_FILE" \
       --parameters \
+        location="$LOCATION" \
         appImageTag="$IMAGE_TAG" \
         revisionSuffix="$REVISION_SUFFIX" \
         containerAppName="$APP_NAME_ACTIVEPIECES" \

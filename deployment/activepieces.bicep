@@ -1,6 +1,6 @@
 // Bicep template for deploying Activepieces with Postgres and Redis
 // --- PARAMETERS ---
-param location string = resourceGroup().location
+param location string // <-- MODIFY THIS LINE
 param environmentName string = 'testContainerEnvironment'
 param acrName string = 'salesopttest'
 param appImageTag string = 'latest'
