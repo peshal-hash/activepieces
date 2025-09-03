@@ -2,7 +2,6 @@
 // --- PARAMETERS ---
 param location string = resourceGroup().location
 param environmentName string = 'testContainerEnvironment'
-param keyVaultName string = 'salesopt-kv-test'
 param acrName string = 'salesopttest'
 param appImageTag string = 'latest'
 param revisionSuffix string = ''
@@ -12,26 +11,22 @@ param postgresAdminUser string
 param redisCacheName string
 param deployNewInfrastructure bool = true
 
-// Secrets are now passed securely from the deployment script
-param postgresAdminPassword string {
+// FIX: The @secure() decorator must be on the line before the parameter.
 @secure()
-}
-param apiKey string {
+param postgresAdminPassword string
+
 @secure()
-}
-param encryptionKey string {
+param apiKey string
+
 @secure()
-}
-param jwtSecret string {
+param encryptionKey string
+
 @secure()
-}
+param jwtSecret string
 
 // --- EXISTING RESOURCES ---
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
-}
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: keyVaultName
 }
 resource environment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
   name: environmentName
@@ -118,7 +113,6 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           identity: managedIdentity.id
         }
       ]
-      // Secrets block is no longer needed as we are setting env vars directly
     }
     template: {
       revisionSuffix: revisionSuffix
@@ -208,7 +202,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
       ]
       scale: {
         minReplicas: 1
-        maxReplicas: 5
+        maxReplicas: 2
         rules: [
           {
             name: 'http-scaling'
