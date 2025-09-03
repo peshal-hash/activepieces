@@ -12,8 +12,17 @@ param postgresAdminUser string
 param redisCacheName string
 param deployNewInfrastructure bool = true
 
-// This password is now passed securely from the deployment script
+// Secrets are now passed securely from the deployment script
 param postgresAdminPassword string {
+@secure()
+}
+param apiKey string {
+@secure()
+}
+param encryptionKey string {
+@secure()
+}
+param jwtSecret string {
 @secure()
 }
 
@@ -29,29 +38,6 @@ resource environment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
 }
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: 'salesopt-ap-container-identity'
-}
-
-// --- SECRETS (REFERENCED ONLY) ---
-// The deployment script now ensures these secrets exist. Bicep only needs to reference them.
-resource existingPostgresUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
-  parent: keyVault
-  name: 'POSTGRES-CONNECTION-STRING'
-}
-resource existingRedisUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
-  parent: keyVault
-  name: 'REDIS-CONNECTION-STRING'
-}
-resource existingApEncryptionKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
-  parent: keyVault
-  name: 'AP-ENCRYPTION-KEY'
-}
-resource existingApJwtSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
-  parent: keyVault
-  name: 'AP-JWT-SECRET'
-}
-resource existingApApiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
-  parent: keyVault
-  name: 'AP-API-KEY'
 }
 
 // --- INFRASTRUCTURE (CONDITIONAL CREATION) ---
@@ -101,24 +87,9 @@ resource existingRedisCache 'Microsoft.Cache/redis@2023-08-01' existing = {
   name: redisCacheName
 }
 
-// --- CONNECTION STRINGS (Created if infrastructure is new) ---
+// --- CONNECTION STRINGS ---
 var postgresConnectionString = 'postgres://${postgresAdminUser}:${postgresAdminPassword}@${existingPostgresServer.properties.fullyQualifiedDomainName}:5432/activepieces'
 var redisConnectionString = 'redis://:${existingRedisCache.listKeys().primaryKey}@${existingRedisCache.properties.hostName}:${existingRedisCache.properties.sslPort}'
-
-resource postgresUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (deployNewInfrastructure) {
-  parent: keyVault
-  name: 'POSTGRES-CONNECTION-STRING'
-  properties: {
-    value: postgresConnectionString
-  }
-}
-resource redisUrlSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (deployNewInfrastructure) {
-  parent: keyVault
-  name: 'REDIS-CONNECTION-STRING'
-  properties: {
-    value: redisConnectionString
-  }
-}
 
 var fqdn = '${containerAppName}.${environment.properties.defaultDomain}'
 
@@ -147,33 +118,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           identity: managedIdentity.id
         }
       ]
-      secrets: [
-        {
-          name: 'postgres-connection-string'
-          keyVaultUrl: existingPostgresUrlSecret.properties.secretUri
-          identity: managedIdentity.id
-        }
-        {
-          name: 'redis-connection-string'
-          keyVaultUrl: existingRedisUrlSecret.properties.secretUri
-          identity: managedIdentity.id
-        }
-        {
-          name: 'ap-encryption-key'
-          keyVaultUrl: existingApEncryptionKeySecret.properties.secretUri
-          identity: managedIdentity.id
-        }
-        {
-          name: 'ap-jwt-secret'
-          keyVaultUrl: existingApJwtSecret.properties.secretUri
-          identity: managedIdentity.id
-        }
-        {
-          name: 'ap-api-key'
-          keyVaultUrl: existingApApiKeySecret.properties.secretUri
-          identity: managedIdentity.id
-        }
-      ]
+      // Secrets block is no longer needed as we are setting env vars directly
     }
     template: {
       revisionSuffix: revisionSuffix
@@ -187,28 +132,28 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           }
           env: [
             {
-              name: 'AP_ENVIRONMENT'
-              value: 'prod'
-            }
-            {
-              name: 'AP_API_KEY'
-              secretRef: 'ap-api-key'
-            }
-            {
-              name: 'AP_ENCRYPTION_KEY'
-              secretRef: 'ap-encryption-key'
-            }
-            {
-              name: 'AP_JWT_SECRET'
-              secretRef: 'ap-jwt-secret'
-            }
-            {
               name: 'AP_POSTGRES_URL'
-              secretRef: 'postgres-connection-string'
+              value: postgresConnectionString
             }
             {
               name: 'AP_REDIS_URL'
-              secretRef: 'redis-connection-string'
+              value: redisConnectionString
+            }
+            {
+              name: 'AP_API_KEY'
+              value: apiKey
+            }
+            {
+              name: 'AP_ENCRYPTION_KEY'
+              value: encryptionKey
+            }
+            {
+              name: 'AP_JWT_SECRET'
+              value: jwtSecret
+            }
+            {
+              name: 'AP_ENVIRONMENT'
+              value: 'prod'
             }
             {
               name: 'AP_FRONTEND_URL'
