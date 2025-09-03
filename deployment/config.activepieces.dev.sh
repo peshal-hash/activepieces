@@ -4,7 +4,7 @@
 ENVIRONMENT_NAME="Development"
 RESOURCE_GROUP="testing-containers"
 ACR_NAME="salesopttest"
-LOCATION="eastus"
+LOCATION="canadacentral"
 BICEP_FILE="./activepieces.bicep"
 KEY_VAULT_NAME="salesopt-kv-test"
 
