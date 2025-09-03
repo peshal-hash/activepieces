@@ -65,9 +65,12 @@ jobs:
         run: |
           cd deployment
           APP_URL=$(./deploy.activepieces.sh --environment dev)
-          echo "app_url=$APP_URL" >> $GITHUB_OUTPUT
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Application URL**: $APP_URL" >> $GITHUB_STEP_SUMMARY
+          echo "app_url=${APP_URL}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Deployment Summary"
+            echo "✅ **Application URL**: ${APP_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
 
   cleanup-on-failure:
     name: Cleanup on Failure

@@ -100,7 +100,7 @@ function deploy_infrastructure() {
         apiKey="$API_KEY" \
         encryptionKey="$ENCRYPTION_KEY" \
         jwtSecret="$JWT_SECRET" \
-      --debug; then
+      --debug 1>&2; then
         write_error "Bicep deployment failed. See debug output above for details."
         exit 1
     fi
@@ -114,6 +114,10 @@ function deploy_infrastructure() {
       --resource-group "$RESOURCE_GROUP" \
       --query "properties.outputs.appUrl.value" \
       -o tsv
+      app_fqdn="${app_fqdn%.}"   # remove a trailing dot if present
+
+      # Echo ONLY the FQDN to stdout so caller can capture it cleanly
+      echo "${app_fqdn}"
 }
 
 function health_check() {
