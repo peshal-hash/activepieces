@@ -2,7 +2,7 @@
 
 // --- PARAMETERS ---
 param location string
-param environmentName string = 'testAPContainerEnvironment'
+param environmentName string = 'testContainerEnvironment'
 param logAnalyticsWorkspaceName string = 'ap-logs-${uniqueString(resourceGroup().id)}'
 param acrName string = 'salesopttest'
 param appImageTag string = 'latest'
@@ -84,6 +84,19 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-pr
       backupRetentionDays: 7
       geoRedundantBackup: 'Disabled'
     }
+  }
+}
+
+// --- THE CHANGE IS HERE ---
+// This resource adds a firewall rule to the PostgreSQL server.
+// The IP range 0.0.0.0 to 0.0.0.0 is a special rule that allows
+// all Azure services to connect to the database.
+resource postgresFirewallRule 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-03-01-preview' = if (deployNewInfrastructure) {
+  parent: postgresServer
+  name: 'AllowAllWindowsAzureIps'
+  properties: {
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '0.0.0.0'
   }
 }
 
@@ -186,11 +199,11 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_BASE_URL'
-              value: 'http://localhost:80'
+              value: 'https://${fqdn}'
             }
             {
               name: 'AP_PROXY_URL'
-              value: 'https://${fqdn}'
+              value: 'http://${fqdn}'
             }
             {
               name: 'AP_WEBHOOK_TIMEOUT_SECONDS'
