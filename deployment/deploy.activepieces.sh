@@ -81,8 +81,8 @@ function deploy_infrastructure() {
 
     local DEPLOY_NEW_INFRA='true'
 
-    # 1. Run the deployment and wait for it to finish.
-    #    The 'if !' structure ensures that if the command fails, the script exits due to 'set -e'.
+    # --- THE CHANGE IS HERE ---
+    # Added --debug flag to get maximum verbose output and identify the root cause.
     if ! az deployment group create \
       --name "$DEPLOYMENT_NAME" \
       --resource-group "$RESOURCE_GROUP" \
@@ -99,15 +99,16 @@ function deploy_infrastructure() {
         postgresAdminPassword="$POSTGRES_PASSWORD" \
         apiKey="$API_KEY" \
         encryptionKey="$ENCRYPTION_KEY" \
-        jwtSecret="$JWT_SECRET"; then
-        write_error "Bicep deployment failed."
+        jwtSecret="$JWT_SECRET" \
+      --debug; then
+        write_error "Bicep deployment failed. See debug output above for details."
         exit 1
     fi
 
     write_success "Bicep deployment completed."
     write_info "Fetching deployment outputs..."
 
-    # 2. Safely retrieve the output from the completed deployment.
+    # Safely retrieve the output from the completed deployment.
     az deployment group show \
       --name "$DEPLOYMENT_NAME" \
       --resource-group "$RESOURCE_GROUP" \
@@ -117,7 +118,6 @@ function deploy_infrastructure() {
 
 function health_check() {
   local app_url=$1
-  # The Bicep output is now just the FQDN, so we add the protocol here.
   local health_endpoint="https://${app_url}/"
   write_info "Performing health check on $health_endpoint..."
   for i in {1..20}; do
@@ -167,3 +167,4 @@ function main() {
 }
 
 main
+
