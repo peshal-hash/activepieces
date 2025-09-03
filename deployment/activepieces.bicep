@@ -128,8 +128,10 @@ resource existingRedisCache 'Microsoft.Cache/redis@2023-08-01' existing = {
 }
 
 // --- CONNECTION STRINGS ---
-var postgresConnectionString = 'postgres://${postgresAdminUser}:${postgresAdminPassword}@${existingPostgresServer.properties.fullyQualifiedDomainName}:5432/activepieces'
-var redisConnectionString = 'redis://:${existingRedisCache.listKeys().primaryKey}@${existingRedisCache.properties.hostName}:${existingRedisCache.properties.sslPort}'
+var postgresHost = existingPostgresServer.properties.fullyQualifiedDomainName
+var redisHost = existingRedisCache.properties.hostName
+var redisPort = '${existingRedisCache.properties.sslPort}'
+
 var fqdn = '${containerAppName}.${existingEnvironment.properties.defaultDomain}'
 
 // --- CONTAINER APP DEPLOYMENT ---
@@ -170,12 +172,32 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           }
           env: [
             {
-              name: 'AP_POSTGRES_URL'
-              value: postgresConnectionString
+              name: 'AP_POSTGRES_DATABASE'
+              value: 'activepieces'
             }
             {
-              name: 'AP_REDIS_URL'
-              value: redisConnectionString
+              name: 'AP_POSTGRES_HOST'
+              value: postgresHost
+            }
+            {
+              name: 'AP_POSTGRES_PORT'
+              value: '5432'
+            }
+            {
+              name: 'AP_POSTGRES_USERNAME'
+              value: postgresAdminUser
+            }
+            {
+              name: 'AP_POSTGRES_PASSWORD'
+              value: postgresAdminPassword
+            }
+            {
+              name: 'AP_REDIS_HOST'
+              value: redisHost
+            }
+            {
+              name: 'AP_REDIS_PORT'
+              value: redisPort
             }
             {
               name: 'AP_API_KEY'
