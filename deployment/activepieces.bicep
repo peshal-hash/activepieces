@@ -145,7 +145,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
       activeRevisionsMode: 'Single'
       ingress: {
         external: true
-        targetPort: 80 // Port exposed by the Activepieces container
+        targetPort: 5000 // Port exposed by the Activepieces container
         transport: 'auto'
       }
       registries: [
@@ -194,7 +194,50 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               name: 'AP_FRONTEND_URL'
               value: 'https://${fqdn}' // Changed to remove the port
             }
-            // Removed AP_BASE, AP_PROXY_URL as they are often not needed when FRONTEND_URL is set correctly
+            {
+              name: 'AP_BASE_URL' // Note: Renamed from AP_BASE for clarity
+              value: 'https://${fqdn}:80'
+            }
+            {
+              name: 'AP_PROXY_URL'
+              value: 'http://${fqdn}'
+            }
+            {
+              name: 'AP_WEBHOOK_TIMEOUT_SECONDS'
+              value: '30'
+            }
+            {
+              name: 'AP_TRIGGER_DEFAULT_POLL_INTERVAL'
+              value: '5'
+            }
+            {
+              name: 'AP_EXECUTION_MODE'
+              value: 'UNSANDBOXED'
+            }
+            {
+              name: 'AP_FLOW_TIMEOUT_SECONDS'
+              value: '600'
+            }
+            {
+              name: 'AP_TELEMETRY_ENABLED'
+              value: 'true'
+            }
+            {
+              name: 'AP_TEMPLATES_SOURCE_URL'
+              value: ''
+            }
+            {
+              name: 'AP_PUBLIC_SIGNUP_PERSONAL'
+              value: 'true'
+            }
+            {
+              name: 'AP_SALESOPTAIURL'
+              value: 'http://localhost:3000' // Note: This points to localhost within the container
+            }
+            {
+              name: 'AP_WEBSITE_NAME'
+              value: 'SalesOptAi'
+            }
           ]
         }
       ]

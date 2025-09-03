@@ -102,7 +102,7 @@ function deploy_infrastructure() {
 
 function health_check() {
   local app_url=$1
-  local health_endpoint="https://${app_url}/"
+  local health_endpoint="${app_url}/"
   write_info "Performing health check on $health_endpoint..."
   for i in {1..20}; do
     if curl --fail -s -o /dev/null "$health_endpoint"; then
@@ -141,7 +141,7 @@ function main() {
 
   echo "" >&2
   write_success "=== ${ENVIRONMENT_NAME} DEPLOYMENT COMPLETED ==="
-  write_success "Application URL: https://$app_fqdn"
+  write_success "Application URL: $app_fqdn"
   write_success "Image Tag: $IMAGE_TAG"
 
   echo "https://$app_fqdn"

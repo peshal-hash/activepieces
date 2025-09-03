@@ -49,68 +49,110 @@ def _filtered_outgoing_headers(incoming: Dict[str, str]) -> Dict[str, str]:
     return {k: v for k, v in incoming.items() if k.lower() not in hop_by_hop}
 
 
-def token_injection_and_url_rewrite(content, content_type: str, _token_to_inject: Optional[str]):
+def url_rewrite(content, content_type: str, token_to_inject: Optional[str]):
     """
-    Only do safe URL rewriting. We avoid injecting tokens into HTML for security.
-    Rewrites upstream origin references to the proxy origin so the app keeps calling us.
+    Rewrites upstream origin references to the proxy origin and injects an auth token
+    into HTML documents for the client-side application.
     """
-    upstream_origin = config.AP_BASE            # e.g., https://upstream.example.com
-    proxy_origin = config.AP_PROXY_URL          # e.g., https://proxy.example.com
+    upstream_origin = config.AP_BASE  # e.g., https://upstream.example.com
+    proxy_origin = config.AP_PROXY_URL      # e.g., https://proxy.example.com
 
+    content_str = None
     if "text" in content_type or "javascript" in content_type or "json" in content_type:
         try:
             content_str = content.decode("utf-8")
         except (UnicodeDecodeError, AttributeError):
-            content_str = content
+            content_str = content  # Already a string
 
+        # Perform token injection for HTML content
+        if "html" in content_type and token_to_inject:
+            soup = BeautifulSoup(content_str, 'html.parser')
+            body = soup.find('body')
+            if body:
+                # This script runs in the user's browser to set the token
+                script_content = f"localStorage.setItem('token', '{token_to_inject}');"
+                script_tag = soup.new_tag('script')
+                script_tag.string = script_content
+                # Insert the script at the very beginning of the <body>
+                body.insert(0, script_tag)
+                content_str = str(soup)
+
+        # Perform URL rewriting for all applicable text-based content
         if isinstance(content_str, str) and upstream_origin and proxy_origin:
             content_str = content_str.replace(upstream_origin.rstrip("/"), proxy_origin.rstrip("/"))
 
         return content_str
+
     return content
 
+
+def token_injection(html_content,token_to_inject):
+    soup = BeautifulSoup(html_content, 'html.parser')
+    if token_to_inject:
+        body = soup.find('body')
+        if body:
+            # This script runs in the user's browser
+            script_content = f"localStorage.setItem('token', '{token_to_inject}');"
+            script_tag = soup.new_tag('script')
+            script_tag.string = script_content
+            # Insert this script at the very beginning of the <body>
+            body.insert(0, script_tag)
+
+    return str(soup)
 
 # =========================================================
 # 1) Auth bootstrap
 # =========================================================
+
 @router.post("/workflow")
 async def workflow(payload: WorkflowPayload):
+    # STEP 1: Add print statements to see if the endpoint is hit and what data is received.
+    print("--- ✅ /workflow endpoint was called! ---")
+    print(f"Received payload: {payload.model_dump_json()}")
+
     global TOKEN_
     try:
+        # This is the first attempt to sign in the user.
+        print("Attempting to sign in...")
         ap_data = await asyncio.to_thread(activepieces_service.sign_in, payload.email, payload.password)
-    except requests.HTTPError:
+        print("Sign in successful.")
+
+    # STEP 2: Broaden the exception catch. This now handles HTTP errors AND other network issues.
+    except requests.RequestException as e:
+        print(f"Sign in failed with error: {e}. Attempting to sign up instead...")
         try:
             ap_data = await asyncio.to_thread(
                 activepieces_service.sign_up, payload.email, payload.password, payload.firstName, payload.lastName
             )
-        except requests.RequestException as e:
-            raise HTTPException(status_code=401, detail=f"Activepieces auth failed: {e}")
+            print("Sign up successful.")
+        except requests.RequestException as signup_error:
+            # If sign-up also fails, raise a clear error.
+            print(f"Sign up also failed: {signup_error}")
+            raise HTTPException(status_code=401, detail=f"Activepieces auth failed on both sign-in and sign-up: {signup_error}")
 
     db_manager.store_user_data(ap_data)
 
     token = ap_data.get("token")
     if not token:
-        raise HTTPException(status_code=500, detail="Failed to get token")
+        raise HTTPException(status_code=500, detail="Failed to get token after auth flow")
 
     async with _token_lock:
         TOKEN_ = token
 
     print(f"AUTH: Token obtained and set globally: {TOKEN_[:10]}...")
 
-    # Set HttpOnly cookie so browser sends it automatically; no JS exposure
     is_https = config.AP_PROXY_URL.lower().startswith("https")
-    resp = JSONResponse(content={"success": True, "redirectUrl": config.AP_PROXY_URL})
+    resp = JSONResponse(content={"success": True, "redirectUrl": config.AP_PROXY_URL,"token":token})
     resp.set_cookie(
         key="ap_token",
         value=token,
         httponly=True,
-        secure=is_https,   # HTTPS: True, localhost http: False
+        secure=is_https,
         samesite="Lax",
         max_age=60 * 60,
         path="/",
     )
     return resp
-
 
 # =========================================================
 # 2) Specific Webhook Handler (HTTP → HTTP)
@@ -232,8 +274,10 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
                         else:
                             await websocket.send_text(data)
                 except ConnectionClosed:
-                    if websocket.client_state.name != "DISCONNECTED":
-                        await websocket.close()
+                    # ✅ FIX: Simply catch the exception and let the task finish.
+                    # The 'finally' block below is the only place we should
+                    # close the client-facing websocket.
+                    pass
 
             t1 = asyncio.create_task(pump_to_upstream())
             t2 = asyncio.create_task(pump_to_browser())
@@ -243,15 +287,17 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
 
     except Exception as e:
         print(f"WS tunnel connect error: {e}")
-        if websocket.client_state.name != "DISCONNECTED":
-            await websocket.close(code=1011)
-        return
+        # The 'finally' block will handle closing, no need to close here.
+        return # Return early to avoid the finally block in case of connect error
     finally:
+        # This is now the single source of truth for closing the client connection.
         if websocket.client_state.name != "DISCONNECTED":
-            await websocket.close()
+            try:
+                await websocket.close()
+            except RuntimeError:
+                # Catch the error in the rare case the state changed between check and close
+                pass
         print("WS tunnel closed.")
-
-
 # =========================================================
 # 4) Generic HTTP Proxy (Catch-All) with flags fix + safe token
 # =========================================================
@@ -270,6 +316,7 @@ async def ap_proxy(request: Request, rest: str = ""):
 
     # Prefer cookie token; fall back to global (read under lock)
     cookie_token = request.cookies.get("ap_token")
+
     async with _token_lock:
         global_token = TOKEN_
     token = cookie_token or global_token
@@ -321,7 +368,7 @@ async def ap_proxy(request: Request, rest: str = ""):
         except Exception:
             pass
 
-    rewritten_content = token_injection_and_url_rewrite(resp.content, content_type, token)
+    rewritten_content = url_rewrite(resp.content, content_type, token)
     excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
     out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
     return Response(content=rewritten_content, status_code=resp.status_code, headers=out_headers)
