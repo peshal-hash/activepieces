@@ -208,6 +208,11 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               name: 'AP_REDIS_PORT'
               value: redisPort
             }
+
+            {
+              name: 'AP_REDIS_PASSWORD'
+              value: existingRedisCache.listKeys().primaryKey
+            }
             {
               name: 'AP_API_KEY'
               value: apiKey
