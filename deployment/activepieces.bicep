@@ -192,6 +192,15 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               value: postgresAdminPassword
             }
             {
+              name: 'AP_POSTGRES_USE_SSL'
+              value: 'true'
+            }
+            {
+              name: 'AP_REDIS_USE_SSL'
+              value: 'true'
+            }
+
+            {
               name: 'AP_REDIS_HOST'
               value: redisHost
             }
@@ -225,7 +234,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_PROXY_URL'
-              value: 'http://${fqdn}'
+              value: 'http://localhost:80'
             }
             {
               name: 'AP_WEBHOOK_TIMEOUT_SECONDS'
