@@ -14,7 +14,7 @@ permissions:
 env:
   AZURE_RESOURCE_GROUP: testing-containers
   AZURE_ACR_NAME: salesopttest
-  AZURE_ENVIRONMENT_NAME: testContainerEnvironment
+  AZURE_ENVIRONMENT_NAME: testAPContainerEnvironment
   AZURE_LOCATION: eastus
   AZURE_KEY_VAULT_NAME: salesopt-kv-test
   APP_NAME_ACTIVEPIECES: salesopt-activepieces-app

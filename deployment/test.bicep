@@ -1,6 +1,6 @@
 // Azure Container Apps deployment using Bicep (with optional Postgres/Redis provisioning)
 param location string = resourceGroup().location
-param environmentName string = 'testContainerEnvironment'
+param environmentName string = 'testAPContainerEnvironment'
 param keyVaultName string = 'salesopt-kv-test'
 param acrName string = 'salesopttest'
 param appImageTag string = 'latest'
@@ -38,7 +38,7 @@ param redisName string = 'salesopt-redis'
 ])
 param redisSkuName string = 'Standard'
 
-@allowed([ 'C' ]) // family C for Basic/Standard/Premium (for classic redis)
+@allowed(['C']) // family C for Basic/Standard/Premium (for classic redis)
 param redisSkuFamily string = 'C'
 
 @minValue(0)
@@ -71,7 +71,7 @@ resource pgServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01' = if (c
   name: postgresServerName
   location: location
   sku: {
-    name: 'Standard_D2ds_v4'    // pick size to taste
+    name: 'Standard_D2ds_v4' // pick size to taste
     tier: 'GeneralPurpose'
     capacity: 2
   }
@@ -110,15 +110,12 @@ resource pgDb 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-12-01' =
 }
 
 // Compute Postgres host and full connection string
-var pgHost = createPostgres
-  ? '${postgresServerName}.postgres.database.azure.com'
-  : '' // when not creating, you might set this via a param instead
+var pgHost = createPostgres ? '${postgresServerName}.postgres.database.azure.com' : '' // when not creating, you might set this via a param instead
 
 // Connection string encoded password (URI-safe)
 var pgConnString = createPostgres
   ? 'postgres://${pgAdminUser}:${uriComponent(pgAdminPass)}@${pgHost}:5432/${postgresDbName}?sslmode=require'
   : ''
-
 
 // ===== REDIS (optional) =====
 resource redis 'Microsoft.Cache/redis@2023-04-01' = if (createRedis) {
@@ -143,7 +140,6 @@ var redisKeys = createRedis ? listKeys(resourceId('Microsoft.Cache/redis', redis
 var redisPrimaryKey = createRedis ? redisKeys.primaryKey : ''
 var redisConnString = createRedis ? 'rediss://:${redisPrimaryKey}@${redisHost}:6380' : ''
 
-
 // ===== Write/Update connection strings back to Key Vault secrets =====
 // These secret names match what your app expects in the Container App config below.
 resource kvSecretPostgresUrl 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (createPostgres) {
@@ -159,7 +155,6 @@ resource kvSecretRedisUrl 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (c
     value: redisConnString
   }
 }
-
 
 // ===== CONTAINER APP (external) =====
 resource activiepiecesApp 'Microsoft.App/containerApps@2023-05-01' = {

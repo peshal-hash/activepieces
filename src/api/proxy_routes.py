@@ -1,9 +1,11 @@
 import asyncio
 import json
 from typing import Optional, Dict
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
-import socketio
+import websockets
+from websockets.exceptions import ConnectionClosed
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, Request, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response, JSONResponse
@@ -61,7 +63,6 @@ def token_injection_and_url_rewrite(content, content_type: str, _token_to_inject
         except (UnicodeDecodeError, AttributeError):
             content_str = content
 
-        # Rewrite upstream absolute urls to the proxy
         if isinstance(content_str, str) and upstream_origin and proxy_origin:
             content_str = content_str.replace(upstream_origin.rstrip("/"), proxy_origin.rstrip("/"))
 
@@ -96,15 +97,17 @@ async def workflow(payload: WorkflowPayload):
 
     print(f"AUTH: Token obtained and set globally: {TOKEN_[:10]}...")
 
-    # Set secure HttpOnly cookie so browser sends it automatically; no JS exposure
+    # Set HttpOnly cookie so browser sends it automatically; no JS exposure
+    is_https = config.AP_PROXY_URL.lower().startswith("https")
     resp = JSONResponse(content={"success": True, "redirectUrl": config.AP_PROXY_URL})
     resp.set_cookie(
         key="ap_token",
         value=token,
         httponly=True,
-        secure=False,
+        secure=is_https,   # HTTPS: True, localhost http: False
         samesite="Lax",
         max_age=60 * 60,
+        path="/",
     )
     return resp
 
@@ -143,119 +146,110 @@ async def v1_webhook_handler(request: Request, rest_of_path: str):
 
 
 # =========================================================
-# 3) Socket.IO WebSocket Bridge
+# 3) Transparent WebSocket tunnel (Engine.IO/Socket.IO)
 # =========================================================
 @router.websocket("/{rest:path}")
 async def websocket_proxy(websocket: WebSocket, rest: str):
+    """
+    Transparent WS tunnel for Socket.IO/Engine.IO: forward frames byte-for-byte
+    to the upstream /api/socket.io endpoint so the real server handles the protocol.
+    """
     await websocket.accept()
 
-    # Prefer cookie token; fall back to global if absent
+    # Build upstream WS URL from AP_BASE + incoming {rest} + original querystring
+    base = config.AP_BASE.rstrip("/")
+    parsed = urlsplit(base)
+    scheme = "wss" if parsed.scheme == "https" else "ws"
+    incoming_qs = ""
+    if websocket.scope.get("query_string"):
+        incoming_qs = str(websocket.scope["query_string"], "latin-1")
+    upstream_path = "/" + rest.lstrip("/")
+    upstream_url = urlunsplit((scheme, parsed.netloc, upstream_path, incoming_qs, ""))
+
+    # Prefer cookie token; fall back to global; optionally use incoming Authorization header
     cookie_token = websocket.cookies.get("ap_token")
     async with _token_lock:
         global_token = TOKEN_
-    header_token = None
-    auth_header = websocket.headers.get("Authorization")
-    if auth_header and auth_header.lower().startswith("bearer "):
-        header_token = auth_header.split(" ", 1)[1].strip()
+    bearer = cookie_token or global_token
+    auth_header = websocket.headers.get("authorization")
+    if not bearer and auth_header and auth_header.lower().startswith("bearer "):
+        bearer = auth_header.split(" ", 1)[1].strip()
 
-    auth_token = cookie_token or global_token or header_token
+    # Prepare headers for upstream
+    extra_headers = [
+        ("X-Forwarded-Proto", websocket.scope.get("scheme", "http")),
+        ("X-Forwarded-Host", websocket.headers.get("host", "")),
+        ("X-Forwarded-For", websocket.client.host if websocket.client else ""),
+    ]
+    # Forward cookies as-is (includes ap_token plus others)
+    incoming_cookies = websocket.headers.get("cookie", "")
+    if incoming_cookies:
+        extra_headers.append(("Cookie", incoming_cookies))
+    if bearer:
+        extra_headers.append(("Authorization", f"Bearer {bearer}"))
 
+    # Preserve Origin when present (some servers enforce it)
+    origin = websocket.headers.get("origin")
 
-    sio_client = socketio.AsyncClient(reconnection=True)
-    to_browser_queue: asyncio.Queue[str] = asyncio.Queue()
+    print(f"WS TUNNEL: {websocket.url}  -->  {upstream_url}")
 
-    async def send_to_browser(text: str):
-        try:
-            await websocket.send_text(text)
-        except RuntimeError:
-            pass  # connection closed
-
-    @sio_client.event
-    async def connect():
-        print("SIO Client: connected to backend.")
-        # Send Socket.IO "open" packet to the browser
-        await send_to_browser("40")
-
-    @sio_client.event
-    async def disconnect():
-        print("SIO Client: disconnected from backend.")
-        await to_browser_queue.put("__CLOSE__")
-
-    # Wildcard events (if supported); otherwise warn so you know to register specific ones
     try:
-        @sio_client.on("*")
-        async def _any(event, data):
-            pkt = f'42{json.dumps([event, data], separators=(",", ":"))}'
-            await to_browser_queue.put(pkt)
-    except TypeError:
-        print("WARNING: python-socketio client wildcard not supported; register specific events explicitly.")
+        async with websockets.connect(
+            upstream_url,
+            extra_headers=extra_headers,
+            origin=origin,
+            open_timeout=20,
+            close_timeout=20,
+            max_size=None,
+            max_queue=None,
+            ping_interval=None,  # Engine.IO handles keepalive
+        ) as upstream_ws:
 
-    # Connect to backend
-    try:
-        backend_url = config.AP_BASE  # e.g. "https://host"
-        auth_payload = {"token": auth_token} if auth_token else None
-        print(f"SIO Client: connecting to {backend_url} (token={bool(auth_token)})")
+            async def pump_to_upstream():
+                try:
+                    while True:
+                        msg = await websocket.receive()
+                        if "text" in msg and msg["text"] is not None:
+                            await upstream_ws.send(msg["text"])
+                        elif "bytes" in msg and msg["bytes"] is not None:
+                            await upstream_ws.send(msg["bytes"])
+                        else:
+                            # ignore other control messages
+                            pass
+                except WebSocketDisconnect:
+                    # browser closed -> close upstream
+                    try:
+                        await upstream_ws.close()
+                    except Exception:
+                        pass
 
-        await sio_client.connect(
-            backend_url,
-            auth=auth_payload,
-            socketio_path="/api/socket.io",
-            transports=["websocket"],
-        )
+            async def pump_to_browser():
+                try:
+                    while True:
+                        data = await upstream_ws.recv()  # str or bytes
+                        if isinstance(data, (bytes, bytearray)):
+                            await websocket.send_bytes(data)
+                        else:
+                            await websocket.send_text(data)
+                except ConnectionClosed:
+                    if websocket.client_state.name != "DISCONNECTED":
+                        await websocket.close()
+
+            t1 = asyncio.create_task(pump_to_upstream())
+            t2 = asyncio.create_task(pump_to_browser())
+            done, pending = await asyncio.wait({t1, t2}, return_when=asyncio.FIRST_COMPLETED)
+            for t in pending:
+                t.cancel()
+
     except Exception as e:
-        print(f"SIO connect error: {e}")
-        await websocket.close(code=4403)
+        print(f"WS tunnel connect error: {e}")
+        if websocket.client_state.name != "DISCONNECTED":
+            await websocket.close(code=1011)
         return
-
-    async def forward_to_backend():
-        try:
-            while True:
-                msg = await websocket.receive()
-                if "text" in msg and msg["text"] is not None:
-                    raw = msg["text"]
-
-                    # Engine.IO ping from browser → reply with pong
-                    if raw == "2":
-                        await send_to_browser("3")
-                        continue
-
-                    # Socket.IO event frame
-                    if raw.startswith("42"):
-                        try:
-                            arr = json.loads(raw[2:])
-                            event = arr[0]
-                            data = arr[1] if len(arr) > 1 else None
-                            await sio_client.emit(event, data)
-                        except Exception as e:
-                            print(f"Parse/emit error: {e}")
-                            continue
-                elif "bytes" in msg and msg["bytes"] is not None:
-                    # ignore/extend if you support binary packets
-                    pass
-        except WebSocketDisconnect:
-            print("Browser disconnected.")
-        finally:
-            await to_browser_queue.put("__CLOSE__")
-
-    async def forward_to_browser():
-        while True:
-            pkt = await to_browser_queue.get()
-            if pkt == "__CLOSE__":
-                break
-            await send_to_browser(pkt)
-
-    task_backend = asyncio.create_task(forward_to_backend())
-    task_browser = asyncio.create_task(forward_to_browser())
-    try:
-        await asyncio.wait({task_backend, task_browser}, return_when=asyncio.FIRST_COMPLETED)
     finally:
-        task_backend.cancel()
-        task_browser.cancel()
-        if sio_client.connected:
-            await sio_client.disconnect()
         if websocket.client_state.name != "DISCONNECTED":
             await websocket.close()
-        print("WebSocket proxy connection closed.")
+        print("WS tunnel closed.")
 
 
 # =========================================================
@@ -263,13 +257,11 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
 # =========================================================
 @router.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def ap_proxy(request: Request, rest: str = ""):
-    global TOKEN_  # <-- IMPORTANT: declare global since we may assign below
+    global TOKEN_
 
-    # Build upstream URL robustly
     base = config.AP_BASE.rstrip("/")
     full_url = f"{base}/{rest.lstrip('/')}"
 
-    # Headers
     incoming = dict(request.headers)
     headers = _filtered_outgoing_headers(incoming)
     headers.setdefault("X-Forwarded-Proto", request.url.scheme)
@@ -284,20 +276,16 @@ async def ap_proxy(request: Request, rest: str = ""):
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
-    # Body (read once)
     body = await request.body()
-
-    # Query params
     q_params = dict(request.query_params)
 
-    # Robust path check for flags (inject projectId from cookie if missing)
+    # Inject projectId for flags if missing (from cookie)
     norm_path = "/" + rest.lstrip("/").split("?", 1)[0].rstrip("/").lower()
     if norm_path.endswith("/api/v1/flags"):
         cookie_pid = request.cookies.get("ap_project_id")
         if cookie_pid and "projectId" not in q_params:
             q_params["projectId"] = cookie_pid
 
-    # Perform upstream request without blocking the event loop
     try:
         resp = await asyncio.to_thread(
             requests.request,
@@ -313,7 +301,7 @@ async def ap_proxy(request: Request, rest: str = ""):
     except requests.exceptions.RequestException as e:
         return Response(content=f"Proxy connection error: {e}", status_code=502)
 
-    # Capture token if upstream returns it in JSON (write under lock)
+    # Capture token if upstream returns it in JSON
     content_type = resp.headers.get("Content-Type", "")
     if resp.status_code == 200 and "application/json" in content_type:
         try:

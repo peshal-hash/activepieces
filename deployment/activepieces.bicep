@@ -1,7 +1,9 @@
 // Bicep template for deploying Activepieces with Postgres and Redis
+
 // --- PARAMETERS ---
 param location string
-param environmentName string = 'testContainerEnvironment'
+param environmentName string = 'testAPContainerEnvironment'
+param logAnalyticsWorkspaceName string = 'ap-logs-${uniqueString(resourceGroup().id)}' // Added for environment logs
 param acrName string = 'salesopttest'
 param appImageTag string = 'latest'
 param revisionSuffix string = ''
@@ -24,17 +26,53 @@ param encryptionKey string
 param jwtSecret string
 
 // --- EXISTING RESOURCES ---
+// NOTE: The 'existing' environment reference has been removed and is now created conditionally below.
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
-}
-resource environment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
-  name: environmentName
 }
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: 'salesopt-container-identity'
 }
 
 // --- INFRASTRUCTURE (CONDITIONAL CREATION) ---
+
+// 1. (NEW) Log Analytics Workspace needed for the Container Apps Environment
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = if (deployNewInfrastructure) {
+  name: logAnalyticsWorkspaceName
+  location: location
+  properties: {
+    sku: {
+      name: 'PerGB2018'
+    }
+  }
+}
+
+// (FIX) Unconditional reference to the Log Analytics Workspace to resolve BCP318 error
+resource existingLogAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
+  name: logAnalyticsWorkspaceName
+}
+
+// 2. (CHANGED) Create the environment if deploying new infrastructure
+resource environment 'Microsoft.App/managedEnvironments@2023-05-01' = if (deployNewInfrastructure) {
+  name: environmentName
+  location: location
+  properties: {
+    appLogsConfiguration: {
+      destination: 'log-analytics'
+      logAnalyticsConfiguration: {
+        // Use the unconditional reference to safely access properties
+        customerId: existingLogAnalyticsWorkspace.properties.customerId
+        sharedKey: existingLogAnalyticsWorkspace.listKeys().primarySharedKey
+      }
+    }
+  }
+}
+
+// Unconditional reference to the environment, for use in the Container App
+resource existingEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
+  name: environmentName
+}
+
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' = if (deployNewInfrastructure) {
   name: postgresServerName
   location: location
@@ -55,16 +93,16 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-pr
     }
   }
 }
+
 resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-03-01-preview' = if (deployNewInfrastructure) {
   parent: postgresServer
   name: 'activepieces'
 }
+
 resource redisCache 'Microsoft.Cache/redis@2023-08-01' = if (deployNewInfrastructure) {
   name: redisCacheName
   location: location
-  // The 'sku' object has been moved from here...
   properties: {
-    // ...to inside the 'properties' block.
     sku: {
       name: 'Basic'
       family: 'C'
@@ -87,7 +125,7 @@ resource existingRedisCache 'Microsoft.Cache/redis@2023-08-01' existing = {
 var postgresConnectionString = 'postgres://${postgresAdminUser}:${postgresAdminPassword}@${existingPostgresServer.properties.fullyQualifiedDomainName}:5432/activepieces'
 var redisConnectionString = 'redis://:${existingRedisCache.listKeys().primaryKey}@${existingRedisCache.properties.hostName}:${existingRedisCache.properties.sslPort}'
 
-var fqdn = '${containerAppName}.${environment.properties.defaultDomain}'
+var fqdn = '${containerAppName}.${existingEnvironment.properties.defaultDomain}'
 
 // --- CONTAINER APP DEPLOYMENT ---
 resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
@@ -100,12 +138,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
     }
   }
   properties: {
-    managedEnvironmentId: environment.id
+    // 3. (CHANGED) This now correctly references the environment that was just created (or already existed)
+    // Bicep automatically creates a dependency, ensuring the environment is ready before the app is deployed.
+    managedEnvironmentId: existingEnvironment.id
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
         external: true
-        targetPort: 5000
+        targetPort: 80 // Port exposed by the Activepieces container
         transport: 'auto'
       }
       registries: [
@@ -152,52 +192,9 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_FRONTEND_URL'
-              value: 'https://${fqdn}:80'
+              value: 'https://${fqdn}' // Changed to remove the port
             }
-            {
-              name: 'AP_BASE'
-              value: 'https://${fqdn}:80'
-            }
-            {
-              name: 'AP_PROXY_URL'
-              value: 'http://${fqdn}'
-            }
-            {
-              name: 'AP_WEBHOOK_TIMEOUT_SECONDS'
-              value: '30'
-            }
-            {
-              name: 'AP_TRIGGER_DEFAULT_POLL_INTERVAL'
-              value: '5'
-            }
-            {
-              name: 'AP_EXECUTION_MODE'
-              value: 'UNSANDBOXED'
-            }
-            {
-              name: 'AP_FLOW_TIMEOUT_SECONDS'
-              value: '600'
-            }
-            {
-              name: 'AP_TELEMETRY_ENABLED'
-              value: 'true'
-            }
-            {
-              name: 'AP_TEMPLATES_SOURCE_URL'
-              value: ''
-            }
-            {
-              name: 'AP_PUBLIC_SIGNUP_PERSONAL'
-              value: 'true'
-            }
-            {
-              name: 'AP_SALESOPTAIURL'
-              value: 'http://localhost:3000'
-            }
-            {
-              name: 'AP_WEBSITE_NAME'
-              value: 'SalesOptAi'
-            }
+            // Removed AP_BASE, AP_PROXY_URL as they are often not needed when FRONTEND_URL is set correctly
           ]
         }
       ]
@@ -220,4 +217,4 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
 }
 
 // --- OUTPUTS ---
-output appUrl string = fqdn
+output appUrl string = 'https://${fqdn}'
