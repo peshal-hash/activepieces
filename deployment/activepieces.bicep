@@ -2,7 +2,7 @@
 
 // --- PARAMETERS ---
 param location string
-param environmentName string = 'testContainerEnvironment'
+param environmentName string = 'testAPContainerEnvironment'
 param logAnalyticsWorkspaceName string = 'ap-logs-${uniqueString(resourceGroup().id)}'
 param acrName string = 'salesopttest'
 param appImageTag string = 'latest'
