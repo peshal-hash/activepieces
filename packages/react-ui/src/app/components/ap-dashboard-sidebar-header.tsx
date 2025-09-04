@@ -1,4 +1,5 @@
 import { t } from 'i18next';
+import { useMemo } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import apLogo from '@/assets/img/logo/ap-logo.png';
@@ -23,8 +24,16 @@ const ApDashboardSidebarHeader = ({
   isHomeDashboard: boolean;
 }) => {
   const { data: edition } = flagsHooks.useFlag<ApEdition>(ApFlagId.EDITION);
-  // Correctly destructure the 'data' property and rename it to salesOptUrl
-  const { data: salesOptUrl } = flagsHooks.useFlag<string>(ApFlagId.SALESOPTAIURL);
+  // Correctly destructure the 'data' property and rename it to salesOptUrls
+  const { data: salesOptUrls } = flagsHooks.useFlag<string>(ApFlagId.SALESOPTAI_URLS);
+  const firstSalesOptUrl = useMemo(() => {
+      // Check if the data exists and is a non-empty string
+      if (salesOptUrls) {
+          // Split the string by the comma, get the first element, and trim any whitespace
+          return salesOptUrls.split(',')[0].trim();
+      }
+      return undefined; // or a default value like ''
+  }, [salesOptUrls]);
 
   const { embedState } = useEmbedding();
   const isInPlatformAdmin = window.location.pathname.includes('platform');
@@ -37,8 +46,8 @@ const ApDashboardSidebarHeader = ({
 
   const handleBackClick = () => {
     // Only attempt to redirect if the URL exists
-    if (salesOptUrl) {
-      window.location.href = salesOptUrl;
+    if (firstSalesOptUrl) {
+      window.location.href = firstSalesOptUrl;
     } else {
       console.error('SalesOpt URL is not available from flags.');
     }
@@ -60,7 +69,7 @@ const ApDashboardSidebarHeader = ({
                 size="icon"
                 onClick={handleBackClick}
                 // Disable the button until the URL has loaded from the backend
-                disabled={!salesOptUrl}
+                disabled={!salesOptUrls}
               >
                 <ArrowLeft className="h-4 w-4" />
                 <span className="sr-only">{t('Go back')}</span>

@@ -172,7 +172,7 @@ const systemPropValidators: {
         return true
     },
     //SALESOPTURL
-    [AppSystemProp.SALESOPTAIURL]: (value: string) => !isNil(value) || 'Value is required',
+    [AppSystemProp.SALESOPTAI_URLS]: (value: string) => !isNil(value) || 'Value is required',
 
 }
 

@@ -89,6 +89,7 @@ function deploy_infrastructure() {
       --template-file "$BICEP_FILE" \
       --parameters \
         location="$LOCATION" \
+        salesoptapis="$SALESOPTAI_APIS" \
         appImageTag="$IMAGE_TAG" \
         revisionSuffix="$REVISION_SUFFIX" \
         containerAppName="$APP_NAME_ACTIVEPIECES" \

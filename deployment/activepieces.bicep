@@ -2,6 +2,7 @@
 
 // --- PARAMETERS ---
 param location string
+param salesoptapis string
 param environmentName string = 'testAPContainerEnvironment'
 param logAnalyticsWorkspaceName string = 'ap-logs-${uniqueString(resourceGroup().id)}'
 param acrName string = 'salesopttest'
@@ -11,6 +12,7 @@ param containerAppName string
 param postgresServerName string
 param postgresAdminUser string
 param redisCacheName string
+
 param deployNewInfrastructure bool = true
 
 @secure()
@@ -270,8 +272,8 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               value: 'true'
             }
             {
-              name: 'AP_SALESOPTAIURL'
-              value: 'http://localhost:3000'
+              name: 'AP_SALESOPTAI_URLS'
+              value: salesoptapis
             }
             {
               name: 'AP_WEBSITE_NAME'

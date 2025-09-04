@@ -1,14 +1,20 @@
 #!/bin/bash
 
-# Production Environment Configuration
-ENVIRONMENT_NAME="Production"
-RESOURCE_GROUP="salesoptai-container-prod"
-ACR_NAME="salesoptaiprod"
-LOCATION="canadaeast"
-BICEP_FILE="./activepieces-prod.bicep" # Assumes bicep file is in the same directory
+# Development Environment Configuration
+ENVIRONMENT_NAME="Development"
+RESOURCE_GROUP="testing-containers"
+ACR_NAME="salesopttest"
+LOCATION="canadacentral"
+BICEP_FILE="./activepieces.bicep"
+KEY_VAULT_NAME="salesopt-kv-test"
 
-# App-specific names
-APP_NAME_ACTIVEPIECES="salesoptai-activepieces-app-prod"
+UNIQUE_ID=$(head -c 4 /dev/urandom | xxd -p)
 
-# Set to 'Multiple' for Blue/Green and 'Single' for standard deployments
-REVISION_MODE="Multiple"
+# App-specific name for the Activepieces container
+APP_NAME_ACTIVEPIECES="salesopt-activepieces-app"
+
+# Names for your new Postgres and Redis resources
+POSTGRES_SERVER_NAME="salesopt-pg-server-dev-${UNIQUE_ID}"
+POSTGRES_ADMIN_USER="salesoptadmin"
+REDIS_CACHE_NAME="salesopt-redis-cache-dev-${UNIQUE_ID}"
+SALESOPTAI_API="https://salesoptai.com , https://www.salesoptai.com , https://app.salesoptai.com"
