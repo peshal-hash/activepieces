@@ -5,8 +5,8 @@ param keyVaultName string = 'salesoptai-prod-keyvault'
 param acrName string = 'salesoptaiprod'
 param appImageTag string = 'latest'
 param paymentImageTag string = 'latest'
-param customDomainEnabled bool = false  // New parameter to control custom domain
-param certificateId string = ''  // Optional certificate ID parameter
+param customDomainEnabled bool = false // New parameter to control custom domain
+param certificateId string = '' // Optional certificate ID parameter
 param revisionSuffix string = '' // Add this line
 
 // Reference existing ACR
@@ -27,7 +27,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10
     sku: {
       name: 'PerGB2018'
     }
-    retentionInDays: 90  // 90 days retention for production
+    retentionInDays: 90 // 90 days retention for production
   }
 }
 
@@ -57,7 +57,10 @@ resource keyVaultSecretsUserRole 'Microsoft.Authorization/roleAssignments@2022-0
   name: guid(keyVault.id, managedIdentity.id, 'Key Vault Secrets User')
   scope: keyVault
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '4633458b-17de-408a-b874-0445c86b69e6'
+    )
     principalId: managedIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
@@ -68,7 +71,10 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(acr.id, managedIdentity.id, 'ACR Pull')
   scope: acr
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+    )
     principalId: managedIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
@@ -87,11 +93,20 @@ resource paymentService 'Microsoft.App/containerApps@2023-05-01' = {
   properties: {
     managedEnvironmentId: environment.id
     configuration: {
-      activeRevisionsMode: 'Multiple'  // Multiple for zero-downtime deployments
+      activeRevisionsMode: 'Multiple' // Multiple for zero-downtime deployments
       ingress: {
         external: false
         targetPort: 8001
         transport: 'http'
+        corsPolicy: {
+          allowedOrigins: [
+            'https://portal.salesoptai.com'
+            'http://localhost:3000'
+          ]
+          allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+          allowedHeaders: ['*']
+          allowCredentials: true
+        }
       }
       registries: [
         {
@@ -112,9 +127,9 @@ resource paymentService 'Microsoft.App/containerApps@2023-05-01' = {
       containers: [
         {
           image: '${acr.properties.loginServer}/salesoptai-payment-prod:${paymentImageTag}'
-	  name: 'payment-service'
+          name: 'payment-service'
           resources: {
-            cpu: json('1.0')  // Higher resources for production
+            cpu: json('1.0') // Higher resources for production
             memory: '2.0Gi'
           }
           env: [
@@ -132,11 +147,11 @@ resource paymentService 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'HELCIM_MONTHLY_PLAN_ID'
-              value: '14570'  // TODO: Verify production plan IDs
+              value: '14570' // TODO: Verify production plan IDs
             }
             {
               name: 'HELCIM_ANNUAL_PLAN_ID'
-              value: '14570'  // TODO: Verify production plan IDs
+              value: '14570' // TODO: Verify production plan IDs
             }
             {
               name: 'HELCIM_API_TOKEN'
@@ -166,7 +181,7 @@ resource paymentService 'Microsoft.App/containerApps@2023-05-01' = {
         }
       ]
       scale: {
-        minReplicas: 2  // Minimum 2 for HA
+        minReplicas: 2 // Minimum 2 for HA
         maxReplicas: 10
         rules: [
           {
@@ -200,7 +215,7 @@ resource mainApp 'Microsoft.App/containerApps@2023-05-01' = {
   properties: {
     managedEnvironmentId: environment.id
     configuration: {
-      activeRevisionsMode: 'Multiple'  // Multiple for zero-downtime deployments
+      activeRevisionsMode: 'Multiple' // Multiple for zero-downtime deployments
       ingress: {
         external: true
         targetPort: 8000
@@ -217,12 +232,14 @@ resource mainApp 'Microsoft.App/containerApps@2023-05-01' = {
           allowCredentials: true
         }
         // Only include custom domains if enabled and certificate ID is provided
-        customDomains: customDomainEnabled && !empty(certificateId) ? [
-          {
-            name: 'api.salesoptai.com'
-            certificateId: certificateId
-          }
-        ] : []
+        customDomains: customDomainEnabled && !empty(certificateId)
+          ? [
+              {
+                name: 'api.salesoptai.com'
+                certificateId: certificateId
+              }
+            ]
+          : []
       }
       registries: [
         {
@@ -298,9 +315,9 @@ resource mainApp 'Microsoft.App/containerApps@2023-05-01' = {
       containers: [
         {
           image: '${acr.properties.loginServer}/salesoptai-app-prod:${appImageTag}'
-	  name: 'main-app'
+          name: 'main-app'
           resources: {
-            cpu: json('2.0')  // Higher resources for production
+            cpu: json('2.0') // Higher resources for production
             memory: '4.0Gi'
           }
           env: [
@@ -404,7 +421,7 @@ resource mainApp 'Microsoft.App/containerApps@2023-05-01' = {
         }
       ]
       scale: {
-        minReplicas: 3  // Minimum 3 for HA
+        minReplicas: 3 // Minimum 3 for HA
         maxReplicas: 20
         rules: [
           {

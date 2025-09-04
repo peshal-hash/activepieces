@@ -63,14 +63,13 @@ jobs:
       - name: Deploy to Azure Container Apps
         id: deploy
         run: |
-          cd deployment
-          APP_URL=$(./deploy.activepieces.sh --environment dev)
-          echo "app_url=${APP_URL}" >> "$GITHUB_OUTPUT"
-          {
-            echo "## Deployment Summary"
-            echo "✅ **Application URL**: ${APP_URL}"
-          } >> "$GITHUB_STEP_SUMMARY"
+          chmod +x ./deploy.activepieces.sh
+          ./deploy.activepieces.sh --environment dev >> $GITHUB_OUTPUT
 
+      - name: Use the Deployment Output
+        run: |
+          echo "Deployment successful! 🚀"
+          echo "Application URL is: ${{ steps.deploy_step.outputs.app_url }}"
 
   cleanup-on-failure:
     name: Cleanup on Failure

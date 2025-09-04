@@ -154,6 +154,16 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
         external: true
         targetPort: 5000
         transport: 'auto'
+        corsPolicy: {
+          allowedOrigins: [
+            'https://portal.salesoptai.com'
+            'http://localhost:3000'
+            'https://gentle-grass-02d3f240f.1.azurestaticapps.net'
+          ]
+          allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+          allowedHeaders: ['*']
+          allowCredentials: true
+        }
       }
       registries: [
         {
