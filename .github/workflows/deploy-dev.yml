@@ -63,6 +63,7 @@ jobs:
       - name: Deploy to Azure Container Apps
         id: deploy
         run: |
+          cd deployment
           chmod +x ./deploy.activepieces.sh
           ./deploy.activepieces.sh --environment dev >> $GITHUB_OUTPUT
 
