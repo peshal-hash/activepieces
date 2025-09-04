@@ -66,7 +66,6 @@ function build_and_push_image() {
   docker push "${ACR_SERVER}/${acr_image_name}:${IMAGE_TAG}" >&2
   write_success "${acr_image_name} image pushed."
 }
-
 function deploy_infrastructure() {
     write_info "Starting Bicep deployment for ${ENVIRONMENT_NAME} environment..."
 
@@ -81,8 +80,6 @@ function deploy_infrastructure() {
 
     local DEPLOY_NEW_INFRA='true'
 
-    # --- THE CHANGE IS HERE ---
-    # Added --debug flag to get maximum verbose output and identify the root cause.
     if ! az deployment group create \
       --name "$DEPLOYMENT_NAME" \
       --resource-group "$RESOURCE_GROUP" \
@@ -109,16 +106,20 @@ function deploy_infrastructure() {
     write_success "Bicep deployment completed."
     write_info "Fetching deployment outputs..."
 
-    # Safely retrieve the output from the completed deployment.
-    az deployment group show \
+    # --- FIX IS HERE ---
+    # 1. Capture the output of the 'az' command into a variable.
+    local raw_fqdn
+    raw_fqdn=$(az deployment group show \
       --name "$DEPLOYMENT_NAME" \
       --resource-group "$RESOURCE_GROUP" \
       --query "properties.outputs.appUrl.value" \
-      -o tsv
-      app_fqdn="${app_fqdn%.}"   # remove a trailing dot if present
+      -o tsv)
 
-      # Echo ONLY the FQDN to stdout so caller can capture it cleanly
-      echo "${app_fqdn}"
+    # 2. Now perform the operation on the variable that has a value.
+    local app_fqdn="${raw_fqdn%.}"   # remove a trailing dot if present
+
+    # 3. Echo ONLY the FQDN to stdout so the main function can capture it cleanly.
+    echo "${app_fqdn}"
 }
 
 function health_check() {
