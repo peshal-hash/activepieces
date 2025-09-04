@@ -247,11 +247,11 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_BASE_URL'
-              value: 'https://${fqdn}'
+              value: 'http://localhost:80'
             }
             {
               name: 'AP_PROXY_URL'
-              value: 'http://localhost:80'
+              value: 'https://${fqdn}'
             }
             {
               name: 'AP_WEBHOOK_TIMEOUT_SECONDS'
