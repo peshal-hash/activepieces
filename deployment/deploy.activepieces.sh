@@ -119,7 +119,7 @@ function deploy_infrastructure() {
     local app_fqdn="${raw_fqdn%.}"   # remove a trailing dot if present
 
     # 3. Echo ONLY the FQDN to stdout so the main function can capture it cleanly.
-    echo "app_url=$app_fqdn"
+    echo "$app_fqdn"
 }
 
 function health_check() {
@@ -174,7 +174,7 @@ function main() {
   write_success "Image Tag: $IMAGE_TAG"
 
   # Final output for the GitHub Actions step
-  echo "app_url=$full_app_url"
+  echo "$full_app_url"
 }
 
 main

@@ -16,7 +16,7 @@ DB_PORT: str = os.environ.get("AP_POSTGRES_PORT", "5432")
 
 # --- Activepieces API Configuration ---
 # The base URL for the Activepieces instance you are proxying.
-AP_BASE: str = os.environ.get("AP_BASE", "http://localhost:80")
+AP_BASE: str = os.environ.get("AP_BASE_URL", "http://localhost:80")
 
 # --- Application Configuration ---
 # The timeout for requests made to the Activepieces API.

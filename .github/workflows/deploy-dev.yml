@@ -65,12 +65,12 @@ jobs:
         run: |
           cd deployment
           chmod +x ./deploy.activepieces.sh
-          ./deploy.activepieces.sh --environment dev >> $GITHUB_OUTPUT
-
-      - name: Use the Deployment Output
-        run: |
-          echo "Deployment successful! 🚀"
-          echo "Application URL is: ${{ steps.deploy_step.outputs.app_url }}"
+          APP_URL=$(./deploy.activepieces.sh --environment dev | tail -n 1)
+          {
+            echo "app_url<<EOF"
+            echo "$APP_URL"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
   cleanup-on-failure:
     name: Cleanup on Failure
