@@ -15,7 +15,7 @@ import requests
 from ..core import config
 from ..services import activepieces_service
 from ..database_management import db_manager
-
+import re
 router = APIRouter()
 
 # =========================================================
@@ -24,6 +24,7 @@ router = APIRouter()
 TOKEN_: str = ""
 _token_lock = asyncio.Lock()
 
+_PLAT_SEGMENT_RE = re.compile(r"(/v1/platforms/)([^/?#]+)", flags=re.IGNORECASE)
 
 class WorkflowPayload(BaseModel):
     email: str
@@ -85,21 +86,6 @@ def url_rewrite(content, content_type: str, token_to_inject: Optional[str]):
 
     return content
 
-
-def token_injection(html_content,token_to_inject):
-    soup = BeautifulSoup(html_content, 'html.parser')
-    if token_to_inject:
-        body = soup.find('body')
-        if body:
-            # This script runs in the user's browser
-            script_content = f"localStorage.setItem('token', '{token_to_inject}');"
-            script_tag = soup.new_tag('script')
-            script_tag.string = script_content
-            # Insert this script at the very beginning of the <body>
-            body.insert(0, script_tag)
-
-    return str(soup)
-
 # =========================================================
 # 1) Auth bootstrap
 # =========================================================
@@ -133,6 +119,8 @@ async def workflow(payload: WorkflowPayload):
     db_manager.store_user_data(ap_data)
 
     token = ap_data.get("token")
+    projectId=ap_data.get("projectId")
+    platformId=ap_data.get("platformId")
     if not token:
         raise HTTPException(status_code=500, detail="Failed to get token after auth flow")
 
@@ -146,6 +134,24 @@ async def workflow(payload: WorkflowPayload):
     resp.set_cookie(
         key="ap_token",
         value=token,
+        httponly=True,
+        secure=is_https,
+        samesite="Lax",
+        max_age=60 * 60,
+        path="/",
+    )
+    resp.set_cookie(
+        key="ap_project_id",
+        value=projectId,
+        httponly=True,
+        secure=is_https,
+        samesite="Lax",
+        max_age=60 * 60,
+        path="/",
+    )
+    resp.set_cookie(
+        key="ap_platform_id",
+        value=platformId,
         httponly=True,
         secure=is_https,
         samesite="Lax",
@@ -208,28 +214,6 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
     upstream_path = "/" + rest.lstrip("/")
     upstream_url = urlunsplit((scheme, parsed.netloc, upstream_path, incoming_qs, ""))
 
-    # Prefer cookie token; fall back to global; optionally use incoming Authorization header
-    cookie_token = websocket.cookies.get("ap_token")
-    async with _token_lock:
-        global_token = TOKEN_
-    bearer = cookie_token or global_token
-    auth_header = websocket.headers.get("authorization")
-    if not bearer and auth_header and auth_header.lower().startswith("bearer "):
-        bearer = auth_header.split(" ", 1)[1].strip()
-
-    # Prepare headers for upstream
-    extra_headers = [
-        ("X-Forwarded-Proto", websocket.scope.get("scheme", "http")),
-        ("X-Forwarded-Host", websocket.headers.get("host", "")),
-        ("X-Forwarded-For", websocket.client.host if websocket.client else ""),
-    ]
-    # Forward cookies as-is (includes ap_token plus others)
-    incoming_cookies = websocket.headers.get("cookie", "")
-    if incoming_cookies:
-        extra_headers.append(("Cookie", incoming_cookies))
-    if bearer:
-        extra_headers.append(("Authorization", f"Bearer {bearer}"))
-
     # Preserve Origin when present (some servers enforce it)
     origin = websocket.headers.get("origin")
 
@@ -238,7 +222,6 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
     try:
         async with websockets.connect(
             upstream_url,
-            extra_headers=extra_headers,
             origin=origin,
             open_timeout=20,
             close_timeout=20,
@@ -287,17 +270,14 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
 
     except Exception as e:
         print(f"WS tunnel connect error: {e}")
-        # The 'finally' block will handle closing, no need to close here.
-        return # Return early to avoid the finally block in case of connect error
+        close_code = 1011  # Internal Error
+        # CHANGE: Removed the unnecessary 'return' statement
+
     finally:
-        # This is now the single source of truth for closing the client connection.
+        # CHANGE: Use the captured close_code to inform the client why the connection is closing.
         if websocket.client_state.name != "DISCONNECTED":
-            try:
-                await websocket.close()
-            except RuntimeError:
-                # Catch the error in the rare case the state changed between check and close
-                pass
-        print("WS tunnel closed.")
+            await websocket.close(code=close_code)
+        print(f"WS tunnel closed with code: {close_code}")
 # =========================================================
 # 4) Generic HTTP Proxy (Catch-All) with flags fix + safe token
 # =========================================================
@@ -307,6 +287,8 @@ async def ap_proxy(request: Request, rest: str = ""):
 
     base = config.AP_BASE.rstrip("/")
     full_url = f"{base}/{rest.lstrip('/')}"
+    print("************************************************************************************")
+    print(full_url)
 
     incoming = dict(request.headers)
     headers = _filtered_outgoing_headers(incoming)
@@ -325,6 +307,9 @@ async def ap_proxy(request: Request, rest: str = ""):
 
     body = await request.body()
     q_params = dict(request.query_params)
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print(q_params)
+    print("************************************************************************************")
 
     # Inject projectId for flags if missing (from cookie)
     norm_path = "/" + rest.lstrip("/").split("?", 1)[0].rstrip("/").lower()
@@ -332,6 +317,15 @@ async def ap_proxy(request: Request, rest: str = ""):
         cookie_pid = request.cookies.get("ap_project_id")
         if cookie_pid and "projectId" not in q_params:
             q_params["projectId"] = cookie_pid
+    cookie_platform_id = request.cookies.get("ap_platform_id")
+    if cookie_platform_id:
+        m = _PLAT_SEGMENT_RE.search(rest)
+        if m:
+            path_platform_id = m.group(2)
+            if path_platform_id != cookie_platform_id:
+                rest = rest[:m.start(2)] + cookie_platform_id + rest[m.end(2):]
+                full_url = f"{base}/{rest.lstrip('/')}"
+                print(f"[PLATFORM-ID REWRITE] '{path_platform_id}' -> '{cookie_platform_id}'")
 
     try:
         resp = await asyncio.to_thread(
