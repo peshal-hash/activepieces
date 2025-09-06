@@ -78,8 +78,6 @@ function deploy_infrastructure() {
     local JWT_SECRET
     JWT_SECRET=$(openssl rand -hex 32)
 
-    local DEPLOY_NEW_INFRA='true'
-
     if ! az deployment group create \
       --name "$DEPLOYMENT_NAME" \
       --resource-group "$RESOURCE_GROUP" \

@@ -12,8 +12,7 @@ param containerAppName string
 param postgresServerName string
 param postgresAdminUser string
 param redisCacheName string
-
-param deployNewInfrastructure bool = true
+param deployNewInfrastructure bool
 
 @secure()
 param postgresAdminPassword string
