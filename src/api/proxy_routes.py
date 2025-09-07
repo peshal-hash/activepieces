@@ -11,7 +11,7 @@ from fastapi import APIRouter, Request, HTTPException, WebSocket, WebSocketDisco
 from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
 import requests
-
+from fastapi.responses import HTMLResponse
 from ..core import config
 from ..services import activepieces_service
 from ..database_management import db_manager
@@ -25,6 +25,7 @@ TOKEN_: str = ""
 _token_lock = asyncio.Lock()
 
 _PLAT_SEGMENT_RE = re.compile(r"(/v1/platforms/)([^/?#]+)", flags=re.IGNORECASE)
+PROJECT_ID_RE = re.compile(r"(/projects/)([^/?#]+)")
 
 class WorkflowPayload(BaseModel):
     email: str
@@ -160,6 +161,41 @@ async def workflow(payload: WorkflowPayload):
     )
     return resp
 
+@router.get("/logout")
+async def logout():
+    """
+    Handles user logout by invalidating the server-side session with Activepieces
+    and clearing the client-side authentication cookie.
+    """
+    global TOKEN_
+
+    if TOKEN_:
+        print("Clearing server-side token.")
+        # Clear the token from the proxy's memory
+        TOKEN_ = None
+    redirect_url =  config.CORS_ORIGINS[0].rstrip('/')
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><title>Logging Out...</title></head>
+    <body>
+        <script>
+            // This script runs in the browser
+            console.log('Clearing localStorage and sessionStorage...');
+            localStorage.clear();
+            sessionStorage.clear();
+            console.log('Redirecting...');
+            window.location.href = '{redirect_url}';
+        </script>
+        <p>Logging out, you will be redirected shortly...</p>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+
+
 # =========================================================
 # 2) Specific Webhook Handler (HTTP → HTTP)
 # =========================================================
@@ -192,10 +228,6 @@ async def v1_webhook_handler(request: Request, rest_of_path: str):
     out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
     return Response(content=resp.content, status_code=resp.status_code, headers=out_headers)
 
-
-# =========================================================
-# 3) Transparent WebSocket tunnel (Engine.IO/Socket.IO)
-# =========================================================
 @router.websocket("/{rest:path}")
 async def websocket_proxy(websocket: WebSocket, rest: str):
     """
@@ -218,8 +250,9 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
     origin = websocket.headers.get("origin")
 
     print(f"WS TUNNEL: {websocket.url}  -->  {upstream_url}")
-
+    close_code = 1000
     try:
+
         async with websockets.connect(
             upstream_url,
             origin=origin,
@@ -285,10 +318,7 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
 async def ap_proxy(request: Request, rest: str = ""):
     global TOKEN_
 
-    base = config.AP_BASE.rstrip("/")
-    full_url = f"{base}/{rest.lstrip('/')}"
     print("************************************************************************************")
-    print(full_url)
 
     incoming = dict(request.headers)
     headers = _filtered_outgoing_headers(incoming)
@@ -302,31 +332,63 @@ async def ap_proxy(request: Request, rest: str = ""):
     async with _token_lock:
         global_token = TOKEN_
     token = cookie_token or global_token
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-
     body = await request.body()
     q_params = dict(request.query_params)
+    cookie_pid = request.cookies.get("ap_project_id")
     print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
     print(q_params)
     print("************************************************************************************")
+    if cookie_pid and "projectId" in q_params and q_params["projectId"] != cookie_pid:
+         print(f"🔄 [PROJECT ID REWRITE] Query Param: Overriding with cookie value.")
+         q_params["projectId"] = cookie_pid
+
+    body = await request.body()
+    modified_body = body
+    content_type = request.headers.get("content-type", "")
+
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    if modified_body != body:
+        headers["content-length"] = str(len(modified_body))
 
     # Inject projectId for flags if missing (from cookie)
-    norm_path = "/" + rest.lstrip("/").split("?", 1)[0].rstrip("/").lower()
-    if norm_path.endswith("/api/v1/flags"):
-        cookie_pid = request.cookies.get("ap_project_id")
-        if cookie_pid and "projectId" not in q_params:
-            q_params["projectId"] = cookie_pid
+
+    if cookie_pid:
+        # If the client sent a projectId, log it before overwriting.
+        headers.setdefault("X-AP-Project-Id", cookie_pid)
+
+        match = PROJECT_ID_RE.search(rest)
+        if match and match.group(2) != cookie_pid:
+            rest = PROJECT_ID_RE.sub(f"\\1{cookie_pid}", rest)
+        if (rest.lstrip('/').startswith("api/v1/flows") or rest.lstrip('/').startswith("v1/flows")):
+            if "projectId" not in q_params:
+                q_params["projectId"] = cookie_pid
+
     cookie_platform_id = request.cookies.get("ap_platform_id")
     if cookie_platform_id:
         m = _PLAT_SEGMENT_RE.search(rest)
+        headers.setdefault("X-AP-Platform-Id", cookie_platform_id)
+
         if m:
             path_platform_id = m.group(2)
             if path_platform_id != cookie_platform_id:
                 rest = rest[:m.start(2)] + cookie_platform_id + rest[m.end(2):]
-                full_url = f"{base}/{rest.lstrip('/')}"
                 print(f"[PLATFORM-ID REWRITE] '{path_platform_id}' -> '{cookie_platform_id}'")
 
+    if cookie_pid and "application/json" in content_type and body:
+        try:
+            data = json.loads(body)
+            if isinstance(data, dict) and "projectId" in data and data["projectId"] != cookie_pid:
+                print(f"🔄 [PROJECT ID REWRITE] JSON Body: Overriding with cookie value.")
+                data["projectId"] = cookie_pid
+                modified_body = json.dumps(data).encode('utf-8')
+        except json.JSONDecodeError:
+            pass
+
+
+
+    full_url = f"{config.AP_BASE.rstrip('/')}/{rest.lstrip('/')}"
     try:
         resp = await asyncio.to_thread(
             requests.request,
@@ -334,7 +396,7 @@ async def ap_proxy(request: Request, rest: str = ""):
             full_url,
             headers=headers,
             params=q_params,
-            data=body,
+            data=modified_body,
             cookies=request.cookies,
             allow_redirects=False,
             timeout=config.TIMEOUT,
