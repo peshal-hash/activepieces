@@ -155,11 +155,11 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
         transport: 'auto'
         corsPolicy: {
           allowedOrigins: [
+            'https://gentle-grass-02d3f240f.1.azurestaticapps.net'
             'https://portal.salesoptai.com'
             'http://localhost:3000'
-            'https://gentle-grass-02d3f240f.1.azurestaticapps.net'
           ]
-          allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+          allowedMethods: ['*']
           allowedHeaders: ['*']
           allowCredentials: true
         }
