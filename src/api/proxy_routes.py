@@ -145,8 +145,8 @@ async def workflow(payload: WorkflowPayload):
         key="ap_token",
         value=token,
         httponly=True,
-        secure=is_https,
-        samesite="Lax",
+        secure=True,
+        samesite="None",
         max_age=60 * 60,
         path="/",
     )
@@ -154,8 +154,8 @@ async def workflow(payload: WorkflowPayload):
         key="ap_project_id",
         value=projectId,
         httponly=True,
-        secure=is_https,
-        samesite="Lax",
+        secure=True,
+        samesite="None",
         max_age=60 * 60,
         path="/",
     )
@@ -163,8 +163,8 @@ async def workflow(payload: WorkflowPayload):
         key="ap_platform_id",
         value=platformId,
         httponly=True,
-        secure=is_https,
-        samesite="Lax",
+        secure=True,
+        samesite="None",
         max_age=60 * 60,
         path="/",
     )
