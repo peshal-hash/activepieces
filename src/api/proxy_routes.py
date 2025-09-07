@@ -1,6 +1,7 @@
 import asyncio
 import json
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
+
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
@@ -21,6 +22,34 @@ router = APIRouter()
 # =========================================================
 # Shared token management (global fallback; prefer cookie)
 # =========================================================
+token_: Optional[str] = None
+project_id: Optional[str] = None
+platform_id: Optional[str] = None
+_state_lock = asyncio.Lock()  # guards the three globals
+
+async def _resolve_auth_from(request: Request) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Prefer request cookies; if not present, fall back to module-level globals.
+    Reading globals is guarded by a lock to avoid torn reads while /workflow is writing.
+    """
+    cookie_token = request.cookies.get("ap_token")
+    cookie_pid = request.cookies.get("ap_project_id")
+    cookie_plat = request.cookies.get("ap_platform_id")
+    async with _state_lock:
+        tok = cookie_token or token_
+        pid = cookie_pid or project_id
+        plat = cookie_plat or platform_id
+    return tok, pid, plat
+
+async def _set_globals(tok: Optional[str], pid: Optional[str], plat: Optional[str]) -> None:
+    async with _state_lock:
+        global token_, project_id, platform_id
+        token_ = tok
+        project_id = pid
+        platform_id = plat
+
+async def _clear_globals() -> None:
+    await _set_globals(None, None, None)
 
 _PLAT_SEGMENT_RE = re.compile(r"(?:^|/)(?:api/)?v1/platforms/([^/?#]+)", re.IGNORECASE)
 
@@ -136,6 +165,7 @@ async def workflow(payload: WorkflowPayload):
     token = ap_data.get("token")
     projectId=ap_data.get("projectId")
     platformId=ap_data.get("platformId")
+    await _set_globals(token, projectId, platformId)
     if not token:
         raise HTTPException(status_code=500, detail="Failed to get token after auth flow")
 
@@ -145,8 +175,8 @@ async def workflow(payload: WorkflowPayload):
         key="ap_token",
         value=token,
         httponly=True,
-        secure=True,
-        samesite="None",
+        secure=is_https,
+        samesite="Lax",
         max_age=60 * 60,
         path="/",
     )
@@ -154,8 +184,8 @@ async def workflow(payload: WorkflowPayload):
         key="ap_project_id",
         value=projectId,
         httponly=True,
-        secure=True,
-        samesite="None",
+        secure=is_https,
+        samesite="Lax",
         max_age=60 * 60,
         path="/",
     )
@@ -163,8 +193,8 @@ async def workflow(payload: WorkflowPayload):
         key="ap_platform_id",
         value=platformId,
         httponly=True,
-        secure=True,
-        samesite="None",
+        secure=is_https,
+        samesite="Lax",
         max_age=60 * 60,
         path="/",
     )
@@ -180,6 +210,7 @@ async def logout():
 
     # 2) Build a tiny page that wipes client storage (belt-and-suspenders)
     redirect_url = config.CORS_ORIGINS[0].rstrip('/')
+    await _clear_globals()
 
     html = f"""
     <script>
@@ -225,8 +256,8 @@ async def logout():
     # Make sure these attributes (domain/path/secure/samesite) match how you originally set them.
     cookie_args = dict(
         httponly=True,
-        secure=True,
-        samesite="None",
+        secure=config.AP_PROXY_URL.startswith("https"),
+        samesite="Lax",
         path="/",
         max_age=0,
         expires="Thu, 01 Jan 1970 00:00:00 GMT",
@@ -249,7 +280,9 @@ async def logout():
 async def v1_webhook_handler(request: Request, rest_of_path: str):
     print("\n✅ --- HTTP Webhook Intercepted! --- ✅")
     full_url = f"{config.AP_BASE.rstrip('/')}/v1/webhooks/{rest_of_path}"
-
+    tok, _, _ = await _resolve_auth_from(request)
+    if tok:
+        headers["Authorization"] = f"Bearer {tok}"
     headers = _filtered_outgoing_headers(dict(request.headers))
     headers.setdefault("X-Forwarded-Proto", request.url.scheme)
     headers.setdefault("X-Forwarded-Host", request.headers.get("host", ""))
@@ -372,13 +405,12 @@ async def ap_proxy(request: Request, rest: str = ""):
     headers.setdefault("X-Forwarded-For", request.client.host if request.client else "")
 
     # Prefer cookie token; fall back to global (read under lock)
-    token = request.cookies.get("ap_token")
     q_params = dict(request.query_params)
-    cookie_pid = request.cookies.get("ap_project_id")
-    cookie_platform_id = request.cookies.get("ap_platform_id")
+
+    token, cookie_pid, cookie_platform_id = await _resolve_auth_from(request)
     print("***********************************************************")
     print(f"token:  {token}")
-    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print("***********************************************************")
     print(f"project id :  {cookie_pid}")
     print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
     print(f"parameters id:  {cookie_platform_id}")
