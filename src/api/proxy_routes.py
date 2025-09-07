@@ -21,11 +21,26 @@ router = APIRouter()
 # =========================================================
 # Shared token management (global fallback; prefer cookie)
 # =========================================================
-TOKEN_: str = ""
-_token_lock = asyncio.Lock()
 
-_PLAT_SEGMENT_RE = re.compile(r"(/v1/platforms/)([^/?#]+)", flags=re.IGNORECASE)
-PROJECT_ID_RE = re.compile(r"(/projects/)([^/?#]+)")
+_PLAT_SEGMENT_RE = re.compile(r"(?:^|/)(?:api/)?v1/platforms/([^/?#]+)", re.IGNORECASE)
+
+PROJECT_FLOW_PATH_RE = re.compile(
+    r"(?P<prefix>(?:^|/)projects/)(?P<pid>[^/?#]+)/flows/(?P<fid>[^/?#]+)",
+    re.IGNORECASE,
+)
+
+# Any ".../projects/{pid}" anywhere in the path (for endpoints without /flows/{fid})
+PROJECT_SEGMENT_RE = re.compile(
+    r"(?P<prefix>(?:^|/)projects/)(?P<pid>[^/?#]+)",
+    re.IGNORECASE,
+)
+
+# Flow endpoints: api/v1/flow/{id} or api/v1/flows/{id} (we NEVER rewrite this id)
+FLOW_ENDPOINT_RE = re.compile(
+    r"(?P<prefix>(?:^|/)(?:api/)?v1/flows?/)(?P<fid>[^/?#]+)",
+    re.IGNORECASE,
+)
+
 
 class WorkflowPayload(BaseModel):
     email: str
@@ -97,7 +112,6 @@ async def workflow(payload: WorkflowPayload):
     print("--- ✅ /workflow endpoint was called! ---")
     print(f"Received payload: {payload.model_dump_json()}")
 
-    global TOKEN_
     try:
         # This is the first attempt to sign in the user.
         print("Attempting to sign in...")
@@ -118,17 +132,12 @@ async def workflow(payload: WorkflowPayload):
             raise HTTPException(status_code=401, detail=f"Activepieces auth failed on both sign-in and sign-up: {signup_error}")
 
     db_manager.store_user_data(ap_data)
-
+    print(ap_data)
     token = ap_data.get("token")
     projectId=ap_data.get("projectId")
     platformId=ap_data.get("platformId")
     if not token:
         raise HTTPException(status_code=500, detail="Failed to get token after auth flow")
-
-    async with _token_lock:
-        TOKEN_ = token
-
-    print(f"AUTH: Token obtained and set globally: {TOKEN_[:10]}...")
 
     is_https = config.AP_PROXY_URL.lower().startswith("https")
     resp = JSONResponse(content={"success": True, "redirectUrl": config.AP_PROXY_URL,"token":token})
@@ -161,38 +170,75 @@ async def workflow(payload: WorkflowPayload):
     )
     return resp
 
+
 @router.get("/logout")
 async def logout():
     """
-    Handles user logout by invalidating the server-side session with Activepieces
-    and clearing the client-side authentication cookie.
+    Log out of the proxied Activepieces session and aggressively clear
+    client-side state so stale flow routes/IDs aren't reused across users.
     """
-    global TOKEN_
 
-    if TOKEN_:
-        print("Clearing server-side token.")
-        # Clear the token from the proxy's memory
-        TOKEN_ = None
-    redirect_url =  config.CORS_ORIGINS[0].rstrip('/')
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head><title>Logging Out...</title></head>
-    <body>
-        <script>
-            // This script runs in the browser
-            console.log('Clearing localStorage and sessionStorage...');
-            localStorage.clear();
-            sessionStorage.clear();
-            console.log('Redirecting...');
-            window.location.href = '{redirect_url}';
-        </script>
-        <p>Logging out, you will be redirected shortly...</p>
-    </body>
-    </html>
+    # 2) Build a tiny page that wipes client storage (belt-and-suspenders)
+    redirect_url = config.CORS_ORIGINS[0].rstrip('/')
+
+    html = f"""
+    <script>
+      // Clear Web Storage
+      try {{
+        localStorage.clear();
+        sessionStorage.clear();
+      }} catch (e) {{}}
+
+      // Clear IndexedDB (best-effort)
+      try {{
+        if (indexedDB && indexedDB.databases) {{
+          indexedDB.databases().then(dbs => dbs.forEach(db => db && db.name && indexedDB.deleteDatabase(db.name)));
+        }}
+      }} catch (e) {{}}
+
+      // Clear Cache Storage (best-effort)
+      try {{
+        if (window.caches && caches.keys) {{
+          caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+        }}
+      }} catch (e) {{}}
+
+      // Unregister service workers (best-effort)
+      try {{
+        navigator.serviceWorker?.getRegistrations?.().then(regs => regs.forEach(r => r.unregister()));
+      }} catch (e) {{}}
+
+      // Redirect back to the host app
+      window.location.replace('{redirect_url}');
+    </script>
     """
-    return HTMLResponse(content=html_content)
 
+    resp = HTMLResponse(content=html, status_code=200)
+
+    # 3) Tell the browser to clear site data **via HTTP headers**
+    # Note: Clear-Site-Data requires HTTPS (allowed on localhost).
+    resp.headers["Clear-Site-Data"] = '"cache", "cookies", "storage"'
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+
+    # 4) Expire all auth/correlation cookies for this origin
+    # Make sure these attributes (domain/path/secure/samesite) match how you originally set them.
+    cookie_args = dict(
+        httponly=True,
+        secure=config.AP_PROXY_URL.startswith("https"),
+        samesite="Lax",
+        path="/",
+        max_age=0,
+        expires="Thu, 01 Jan 1970 00:00:00 GMT",
+    )
+    for name in ("ap_token", "ap_project_id", "ap_platform_id", "ap_session_born"):
+        resp.set_cookie(name, value="", **cookie_args)
+
+    # Optional: help proxies/CDNs avoid cross-user cache bleed
+    resp.headers["Vary"] = "Cookie"
+
+    print("=== LOGOUT: cleared proxy token, set Clear-Site-Data, expired cookies ===")
+    return resp
 
 
 
@@ -316,9 +362,8 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
 # =========================================================
 @router.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def ap_proxy(request: Request, rest: str = ""):
-    global TOKEN_
 
-    print("************************************************************************************")
+
 
     incoming = dict(request.headers)
     headers = _filtered_outgoing_headers(incoming)
@@ -327,21 +372,9 @@ async def ap_proxy(request: Request, rest: str = ""):
     headers.setdefault("X-Forwarded-For", request.client.host if request.client else "")
 
     # Prefer cookie token; fall back to global (read under lock)
-    cookie_token = request.cookies.get("ap_token")
-
-    async with _token_lock:
-        global_token = TOKEN_
-    token = cookie_token or global_token
-    body = await request.body()
+    token = request.cookies.get("ap_token")
     q_params = dict(request.query_params)
     cookie_pid = request.cookies.get("ap_project_id")
-    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-    print(q_params)
-    print("************************************************************************************")
-    if cookie_pid and "projectId" in q_params and q_params["projectId"] != cookie_pid:
-         print(f"🔄 [PROJECT ID REWRITE] Query Param: Overriding with cookie value.")
-         q_params["projectId"] = cookie_pid
-
     body = await request.body()
     modified_body = body
     content_type = request.headers.get("content-type", "")
@@ -353,42 +386,69 @@ async def ap_proxy(request: Request, rest: str = ""):
         headers["content-length"] = str(len(modified_body))
 
     # Inject projectId for flags if missing (from cookie)
-
-    if cookie_pid:
-        # If the client sent a projectId, log it before overwriting.
-        headers.setdefault("X-AP-Project-Id", cookie_pid)
-
-        match = PROJECT_ID_RE.search(rest)
-        if match and match.group(2) != cookie_pid:
-            rest = PROJECT_ID_RE.sub(f"\\1{cookie_pid}", rest)
-        if (rest.lstrip('/').startswith("api/v1/flows") or rest.lstrip('/').startswith("v1/flows")):
-            if "projectId" not in q_params:
-                q_params["projectId"] = cookie_pid
-
     cookie_platform_id = request.cookies.get("ap_platform_id")
     if cookie_platform_id:
         m = _PLAT_SEGMENT_RE.search(rest)
         headers.setdefault("X-AP-Platform-Id", cookie_platform_id)
-
         if m:
-            path_platform_id = m.group(2)
+            path_platform_id = m.group(1)      # ← changed from 2 to 1
             if path_platform_id != cookie_platform_id:
-                rest = rest[:m.start(2)] + cookie_platform_id + rest[m.end(2):]
-                print(f"[PLATFORM-ID REWRITE] '{path_platform_id}' -> '{cookie_platform_id}'")
+                start, end = m.span(1)         # ← changed from 2 to 1
+                rest = rest[:start] + cookie_platform_id + rest[end:]
+# --- inside ap_proxy(), after you've got: rest, q_params, body, content_type, cookie_pid, token, etc. ---
 
-    if cookie_pid and "application/json" in content_type and body:
-        try:
-            data = json.loads(body)
-            if isinstance(data, dict) and "projectId" in data and data["projectId"] != cookie_pid:
-                print(f"🔄 [PROJECT ID REWRITE] JSON Body: Overriding with cookie value.")
-                data["projectId"] = cookie_pid
-                modified_body = json.dumps(data).encode('utf-8')
-        except json.JSONDecodeError:
-            pass
+    cookie_pid = request.cookies.get("ap_project_id")
+    if cookie_pid:
+        headers.setdefault("X-AP-Project-Id", cookie_pid)
+        # 1) Specific case: /projects/{pid}/flows/{fid}   -> only rewrite {pid}, never {fid}
+        m_pf = PROJECT_FLOW_PATH_RE.search(rest)
+        if m_pf:
+            path_pid = m_pf.group("pid")
+            if path_pid != cookie_pid:
+                s, e = m_pf.span("pid")  # replace ONLY the project id segment
+                rest = rest[:s] + cookie_pid + rest[e:]
+                print(f"[PROJECT-ID REWRITE:PATH projects/.../flows/...] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
+
+        else:
+            # 2) Generic /projects/{pid} anywhere (but avoid touching flow id segments)
+            #    Find the LAST occurrence in case path contains projects twice (rare, but safer).
+            last = None
+            for m in PROJECT_SEGMENT_RE.finditer(rest):
+                last = m
+            if last:
+                path_pid = last.group("pid")
+                if path_pid != cookie_pid:
+                    s, e = last.span("pid")
+                    rest = rest[:s] + cookie_pid + rest[e:]
+                    print(f"[PROJECT-ID REWRITE:PATH projects/... ] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
+
+        # 3) QUERY: only normalize keys that are actually project-related
+        if "projectId" in q_params and q_params["projectId"] != cookie_pid:
+            print(f"[PROJECT-ID REWRITE:QUERY] '{q_params['projectId']}' -> '{cookie_pid}'")
+            q_params["projectId"] = cookie_pid
 
 
 
     full_url = f"{config.AP_BASE.rstrip('/')}/{rest.lstrip('/')}"
+    method = request.method.upper()
+
+    if method == "GET":
+        content_to_send = None
+        # do NOT override Content-Length for GET
+        headers.pop("Content-Length", None)
+        headers.pop("content-length", None)
+        # if caller set Content-Type but there's no body, drop it to be safe
+        if "application/json" in headers.get("Content-Type", ""):
+            headers.pop("Content-Type", None)
+    else:
+        content_to_send = modified_body
+
+    # 2) DEBUG: print exactly what we are about to send upstream
+    try:
+        from urllib.parse import urlencode
+        print(f"[UPSTREAM REQ] {method} {full_url}?{urlencode(q_params, doseq=True)}")
+    except Exception:
+        pass
     try:
         resp = await asyncio.to_thread(
             requests.request,
@@ -396,7 +456,7 @@ async def ap_proxy(request: Request, rest: str = ""):
             full_url,
             headers=headers,
             params=q_params,
-            data=modified_body,
+            data=content_to_send,
             cookies=request.cookies,
             allow_redirects=False,
             timeout=config.TIMEOUT,
@@ -406,17 +466,6 @@ async def ap_proxy(request: Request, rest: str = ""):
 
     # Capture token if upstream returns it in JSON
     content_type = resp.headers.get("Content-Type", "")
-    if resp.status_code == 200 and "application/json" in content_type:
-        try:
-            data = resp.json()
-            if isinstance(data, dict) and isinstance(data.get("token"), str):
-                new_token = data["token"]
-                async with _token_lock:
-                    if TOKEN_ != new_token:
-                        TOKEN_ = new_token
-                        print(f"AUTH: Real token CAPTURED from '{rest}': {TOKEN_[:10]}...")
-        except json.JSONDecodeError:
-            pass
 
     if 400 <= resp.status_code < 600:
         try:
