@@ -375,6 +375,14 @@ async def ap_proxy(request: Request, rest: str = ""):
     token = request.cookies.get("ap_token")
     q_params = dict(request.query_params)
     cookie_pid = request.cookies.get("ap_project_id")
+    cookie_platform_id = request.cookies.get("ap_platform_id")
+    print("***********************************************************")
+    print(f"token:  {token}")
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print(f"project id :  {cookie_pid}")
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print(f"parameters id:  {cookie_platform_id}")
+    print("***********************************************************")
     body = await request.body()
     modified_body = body
     content_type = request.headers.get("content-type", "")
@@ -386,7 +394,6 @@ async def ap_proxy(request: Request, rest: str = ""):
         headers["content-length"] = str(len(modified_body))
 
     # Inject projectId for flags if missing (from cookie)
-    cookie_platform_id = request.cookies.get("ap_platform_id")
     if cookie_platform_id:
         m = _PLAT_SEGMENT_RE.search(rest)
         headers.setdefault("X-AP-Platform-Id", cookie_platform_id)
@@ -430,23 +437,11 @@ async def ap_proxy(request: Request, rest: str = ""):
 
 
     full_url = f"{config.AP_BASE.rstrip('/')}/{rest.lstrip('/')}"
-    method = request.method.upper()
-
-    if method == "GET":
-        content_to_send = None
-        # do NOT override Content-Length for GET
-        headers.pop("Content-Length", None)
-        headers.pop("content-length", None)
-        # if caller set Content-Type but there's no body, drop it to be safe
-        if "application/json" in headers.get("Content-Type", ""):
-            headers.pop("Content-Type", None)
-    else:
-        content_to_send = modified_body
 
     # 2) DEBUG: print exactly what we are about to send upstream
     try:
         from urllib.parse import urlencode
-        print(f"[UPSTREAM REQ] {method} {full_url}?{urlencode(q_params, doseq=True)}")
+        print(f"[UPSTREAM REQ] {request.method} {full_url}?{urlencode(q_params, doseq=True)}")
     except Exception:
         pass
     try:
@@ -456,7 +451,7 @@ async def ap_proxy(request: Request, rest: str = ""):
             full_url,
             headers=headers,
             params=q_params,
-            data=content_to_send,
+            data=modified_body,
             cookies=request.cookies,
             allow_redirects=False,
             timeout=config.TIMEOUT,
