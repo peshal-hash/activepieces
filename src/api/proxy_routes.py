@@ -225,8 +225,8 @@ async def logout():
     # Make sure these attributes (domain/path/secure/samesite) match how you originally set them.
     cookie_args = dict(
         httponly=True,
-        secure=config.AP_PROXY_URL.startswith("https"),
-        samesite="Lax",
+        secure=True,
+        samesite="None",
         path="/",
         max_age=0,
         expires="Thu, 01 Jan 1970 00:00:00 GMT",
