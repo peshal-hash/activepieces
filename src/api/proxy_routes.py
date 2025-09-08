@@ -3,7 +3,7 @@ import json
 from typing import Optional, Dict, Tuple
 
 from urllib.parse import urlsplit, urlunsplit
-
+import contextlib
 import httpx
 import websockets
 from websockets.exceptions import ConnectionClosed
@@ -51,22 +51,15 @@ async def _set_globals(tok: Optional[str], pid: Optional[str], plat: Optional[st
 async def _clear_globals() -> None:
     await _set_globals(None, None, None)
 
-_PLAT_SEGMENT_RE = re.compile(r"(?:^|/)(?:api/)?v1/platforms/([^/?#]+)", re.IGNORECASE)
 
+PLAT_SEGMENT_RE = re.compile(r"(?:^|/)(?:api/)?v1/platforms/([^/?#]+)", re.IGNORECASE)
 PROJECT_FLOW_PATH_RE = re.compile(
     r"(?P<prefix>(?:^|/)projects/)(?P<pid>[^/?#]+)/flows/(?P<fid>[^/?#]+)",
     re.IGNORECASE,
 )
-
-# Any ".../projects/{pid}" anywhere in the path (for endpoints without /flows/{fid})
-PROJECT_SEGMENT_RE = re.compile(
-    r"(?P<prefix>(?:^|/)projects/)(?P<pid>[^/?#]+)",
-    re.IGNORECASE,
-)
-
-# Flow endpoints: api/v1/flow/{id} or api/v1/flows/{id} (we NEVER rewrite this id)
-FLOW_ENDPOINT_RE = re.compile(
-    r"(?P<prefix>(?:^|/)(?:api/)?v1/flows?/)(?P<fid>[^/?#]+)",
+PROJECT_SEGMENT_RE = re.compile(r"(?P<prefix>(?:^|/)projects/)(?P<pid>[^/?#]+)", re.IGNORECASE)
+USERS_PROJECT_RE = re.compile(
+    r"(?P<prefix>(?:^|/)(?:api/)?v1/users/projects/)(?P<pid>[^/?#]+)",
     re.IGNORECASE,
 )
 
@@ -276,37 +269,61 @@ async def logout():
 # =========================================================
 # 2) Specific Webhook Handler (HTTP → HTTP)
 # =========================================================
+# =========================================================
+# 2) Specific Webhook Handler (HTTP → HTTP)  — hardened
+# =========================================================
 @router.api_route("/v1/webhooks/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def v1_webhook_handler(request: Request, rest_of_path: str):
     print("\n✅ --- HTTP Webhook Intercepted! --- ✅")
     full_url = f"{config.AP_BASE.rstrip('/')}/v1/webhooks/{rest_of_path}"
-    tok, _, _ = await _resolve_auth_from(request)
-    if tok:
-        headers["Authorization"] = f"Bearer {tok}"
+
+    # 1) Build outbound headers first (fixes NameError and hop-by-hop leakage)
     headers = _filtered_outgoing_headers(dict(request.headers))
     headers.setdefault("X-Forwarded-Proto", request.url.scheme)
     headers.setdefault("X-Forwarded-Host", request.headers.get("host", ""))
     headers.setdefault("X-Forwarded-For", request.client.host if request.client else "")
 
-    body = await request.body()
+    # 2) Attach auth if we have it
+    tok, _, _ = await _resolve_auth_from(request)
+    if tok:
+        headers["Authorization"] = f"Bearer {tok}"
 
+    # 3) Body + params (DON’T send a naked "?" if empty)
+    body = await request.body()
+    q_params = dict(request.query_params)
+    params = q_params if q_params else None
+
+    # 4) Debug
+    try:
+        from urllib.parse import urlencode
+        print(f"[UPSTREAM REQ] {request.method} {full_url}" + (f"?{urlencode(q_params, doseq=True)}" if q_params else ""))
+    except Exception:
+        pass
+
+    # 5) Send upstream
     try:
         async with httpx.AsyncClient(timeout=config.TIMEOUT, follow_redirects=False) as client:
             resp = await client.request(
                 method=request.method,
                 url=full_url,
                 headers=headers,
-                params=dict(request.query_params),
+                params=params,          # <- None when empty to avoid "?"
                 content=body,
-                cookies=request.cookies,  # forward cookies if present
+                cookies=request.cookies,
             )
     except httpx.RequestError as e:
         return Response(content=f"Proxy connection error on webhook: {e}", status_code=502)
 
+    # 6) Filter unsafe headers on the way back
     excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
     out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
     return Response(content=resp.content, status_code=resp.status_code, headers=out_headers)
-
+# =========================================================
+# WebSocket tunnel — robust to client disconnects
+# =========================================================
+# =========================================================
+# WebSocket tunnel — robust to client disconnects
+# =========================================================
 @router.websocket("/{rest:path}")
 async def websocket_proxy(websocket: WebSocket, rest: str):
     """
@@ -325,13 +342,12 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
     upstream_path = "/" + rest.lstrip("/")
     upstream_url = urlunsplit((scheme, parsed.netloc, upstream_path, incoming_qs, ""))
 
-    # Preserve Origin when present (some servers enforce it)
-    origin = websocket.headers.get("origin")
+    origin = websocket.headers.get("origin")  # preserve Origin when present
 
     print(f"WS TUNNEL: {websocket.url}  -->  {upstream_url}")
     close_code = 1000
-    try:
 
+    try:
         async with websockets.connect(
             upstream_url,
             origin=origin,
@@ -343,24 +359,39 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
         ) as upstream_ws:
 
             async def pump_to_upstream():
+                # Browser -> Upstream
                 try:
                     while True:
-                        msg = await websocket.receive()
+                        try:
+                            msg = await websocket.receive()
+                        except WebSocketDisconnect:
+                            # Browser closed; close upstream and exit
+                            try:
+                                await upstream_ws.close()
+                            except Exception:
+                                pass
+                            return
+                        except RuntimeError as e:
+                            # Starlette raises after a disconnect has been received
+                            if 'disconnect message has been received' in str(e).lower():
+                                try:
+                                    await upstream_ws.close()
+                                except Exception:
+                                    pass
+                                return
+                            raise  # other runtime errors should bubble
+
                         if "text" in msg and msg["text"] is not None:
                             await upstream_ws.send(msg["text"])
                         elif "bytes" in msg and msg["bytes"] is not None:
                             await upstream_ws.send(msg["bytes"])
-                        else:
-                            # ignore other control messages
-                            pass
-                except WebSocketDisconnect:
-                    # browser closed -> close upstream
-                    try:
-                        await upstream_ws.close()
-                    except Exception:
-                        pass
+                        # else ignore control messages
+                except Exception:
+                    # swallow — outer finally will handle client close/logging
+                    pass
 
             async def pump_to_browser():
+                # Upstream -> Browser
                 try:
                     while True:
                         data = await upstream_ws.recv()  # str or bytes
@@ -369,45 +400,63 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
                         else:
                             await websocket.send_text(data)
                 except ConnectionClosed:
-                    # ✅ FIX: Simply catch the exception and let the task finish.
-                    # The 'finally' block below is the only place we should
-                    # close the client-facing websocket.
+                    # Upstream closed; just exit loop
                     pass
+                except RuntimeError as e:
+                    # If Starlette socket already gone, exit quietly
+                    if 'websocket' in str(e).lower():
+                        pass
+                    else:
+                        raise
 
             t1 = asyncio.create_task(pump_to_upstream())
             t2 = asyncio.create_task(pump_to_browser())
             done, pending = await asyncio.wait({t1, t2}, return_when=asyncio.FIRST_COMPLETED)
+
+            # Cancel the remaining task cleanly
             for t in pending:
                 t.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await t
 
     except Exception as e:
         print(f"WS tunnel connect error: {e}")
         close_code = 1011  # Internal Error
-        # CHANGE: Removed the unnecessary 'return' statement
 
     finally:
-        # CHANGE: Use the captured close_code to inform the client why the connection is closing.
         if websocket.client_state.name != "DISCONNECTED":
-            await websocket.close(code=close_code)
+            try:
+                await websocket.close(code=close_code)
+            except Exception:
+                pass
         print(f"WS tunnel closed with code: {close_code}")
+
 # =========================================================
 # 4) Generic HTTP Proxy (Catch-All) with flags fix + safe token
 # =========================================================
 @router.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def ap_proxy(request: Request, rest: str = ""):
+    # --- Parse/merge any accidental query string that snuck into `rest` ---
+    # FastAPI normally strips it, but hardening for safety:
+    from urllib.parse import parse_qsl, urlencode
 
+    extra_qs = {}
+    if "?" in rest:
+        path_only, qs = rest.split("?", 1)
+        rest = path_only
+        if qs:
+            extra_qs = dict(parse_qsl(qs, keep_blank_values=True))
 
-
+    # --- Build base headers first (before adding Authorization) ---
     incoming = dict(request.headers)
     headers = _filtered_outgoing_headers(incoming)
     headers.setdefault("X-Forwarded-Proto", request.url.scheme)
     headers.setdefault("X-Forwarded-Host", incoming.get("host", ""))
     headers.setdefault("X-Forwarded-For", request.client.host if request.client else "")
 
-    # Prefer cookie token; fall back to global (read under lock)
-    q_params = dict(request.query_params)
-
+    # Prefer cookie token; fall back to globals (resolved atomically)
     token, cookie_pid, cookie_platform_id = await _resolve_auth_from(request)
+
     print("***********************************************************")
     print(f"token:  {token}")
     print("***********************************************************")
@@ -415,9 +464,10 @@ async def ap_proxy(request: Request, rest: str = ""):
     print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
     print(f"parameters id:  {cookie_platform_id}")
     print("***********************************************************")
+
     body = await request.body()
     modified_body = body
-    content_type = request.headers.get("content-type", "")
+    req_content_type = request.headers.get("content-type", "")
 
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -425,32 +475,48 @@ async def ap_proxy(request: Request, rest: str = ""):
     if modified_body != body:
         headers["content-length"] = str(len(modified_body))
 
-    # Inject projectId for flags if missing (from cookie)
-    if cookie_platform_id:
-        m = _PLAT_SEGMENT_RE.search(rest)
-        headers.setdefault("X-AP-Platform-Id", cookie_platform_id)
-        if m:
-            path_platform_id = m.group(1)      # ← changed from 2 to 1
-            if path_platform_id != cookie_platform_id:
-                start, end = m.span(1)         # ← changed from 2 to 1
-                rest = rest[:start] + cookie_platform_id + rest[end:]
-# --- inside ap_proxy(), after you've got: rest, q_params, body, content_type, cookie_pid, token, etc. ---
+    # --------------------------
+    # Start with query params: merge real query with any extra_qs from rest
+    # --------------------------
+    q_params = dict(request.query_params)  # Starlette's QueryParams -> dict
+    if extra_qs:
+        # merge: request.query_params has precedence; keep existing values
+        for k, v in extra_qs.items():
+            q_params.setdefault(k, v)
 
-    cookie_pid = request.cookies.get("ap_project_id")
+    # Upstream is AP_BASE + normalized rest
+    # Strip a naked trailing '?' if it somehow exists after manipulations (belt & suspenders)
+    if rest.endswith("?"):
+        rest = rest[:-1]
+
+    # --------------------------
+    # Platform ID normalization (path + header)
+    # --------------------------
+    if cookie_platform_id:
+        headers.setdefault("X-AP-Platform-Id", cookie_platform_id)
+        m = PLAT_SEGMENT_RE.search(rest)
+        if m:
+            path_platform_id = m.group(1)
+            if path_platform_id != cookie_platform_id:
+                s, e = m.span(1)
+                rest = rest[:s] + cookie_platform_id + rest[e:]
+
+    # --------------------------
+    # Project ID normalization (paths + query)
+    # --------------------------
     if cookie_pid:
         headers.setdefault("X-AP-Project-Id", cookie_pid)
-        # 1) Specific case: /projects/{pid}/flows/{fid}   -> only rewrite {pid}, never {fid}
+
+        # /projects/{pid}/flows/{fid} (replace only pid)
         m_pf = PROJECT_FLOW_PATH_RE.search(rest)
         if m_pf:
             path_pid = m_pf.group("pid")
             if path_pid != cookie_pid:
-                s, e = m_pf.span("pid")  # replace ONLY the project id segment
+                s, e = m_pf.span("pid")
                 rest = rest[:s] + cookie_pid + rest[e:]
                 print(f"[PROJECT-ID REWRITE:PATH projects/.../flows/...] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
-
         else:
-            # 2) Generic /projects/{pid} anywhere (but avoid touching flow id segments)
-            #    Find the LAST occurrence in case path contains projects twice (rare, but safer).
+            # Any /projects/{pid} (use last occurrence if multiple)
             last = None
             for m in PROJECT_SEGMENT_RE.finditer(rest):
                 last = m
@@ -459,30 +525,44 @@ async def ap_proxy(request: Request, rest: str = ""):
                 if path_pid != cookie_pid:
                     s, e = last.span("pid")
                     rest = rest[:s] + cookie_pid + rest[e:]
-                    print(f"[PROJECT-ID REWRITE:PATH projects/... ] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
+                    print(f"[PROJECT-ID REWRITE:PATH projects/...] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
 
-        # 3) QUERY: only normalize keys that are actually project-related
+        # /api/v1/users/projects/{pid}
+        m_up = USERS_PROJECT_RE.search(rest)
+        if m_up:
+            path_pid = m_up.group("pid")
+            if path_pid != cookie_pid:
+                s, e = m_up.span("pid")
+                rest = rest[:s] + cookie_pid + rest[e:]
+                print(f"[PROJECT-ID REWRITE:PATH users/projects] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
+
+        # Query: normalize `projectId`
         if "projectId" in q_params and q_params["projectId"] != cookie_pid:
             print(f"[PROJECT-ID REWRITE:QUERY] '{q_params['projectId']}' -> '{cookie_pid}'")
             q_params["projectId"] = cookie_pid
 
-
+    # Optional: upstream treats literal "NULL" poorly; drop it
+    if q_params.get("folderId") == "NULL":
+        q_params.pop("folderId", None)
 
     full_url = f"{config.AP_BASE.rstrip('/')}/{rest.lstrip('/')}"
 
-    # 2) DEBUG: print exactly what we are about to send upstream
+    # Log without trailing '?' when there is no query
+    qs = urlencode(q_params, doseq=True) if q_params else ""
+    log_url = f"{full_url}{('?' + qs) if qs else ''}"
     try:
-        from urllib.parse import urlencode
-        print(f"[UPSTREAM REQ] {request.method} {full_url}?{urlencode(q_params, doseq=True)}")
+        print(f"[UPSTREAM REQ] {request.method} {log_url}")
     except Exception:
         pass
+
+    # Forward (params=None avoids adding a stray '?')
     try:
         resp = await asyncio.to_thread(
             requests.request,
             request.method,
             full_url,
             headers=headers,
-            params=q_params,
+            params=(q_params or None),
             data=modified_body,
             cookies=request.cookies,
             allow_redirects=False,
@@ -491,16 +571,15 @@ async def ap_proxy(request: Request, rest: str = ""):
     except requests.exceptions.RequestException as e:
         return Response(content=f"Proxy connection error: {e}", status_code=502)
 
-    # Capture token if upstream returns it in JSON
-    content_type = resp.headers.get("Content-Type", "")
-
+    # Response processing
+    resp_content_type = resp.headers.get("Content-Type", "")
     if 400 <= resp.status_code < 600:
         try:
             print(f"[UPSTREAM {resp.status_code}] {rest} -> {resp.text[:500]}")
         except Exception:
             pass
 
-    rewritten_content = url_rewrite(resp.content, content_type, token)
+    rewritten_content = url_rewrite(resp.content, resp_content_type, token)
     excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
     out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
     return Response(content=rewritten_content, status_code=resp.status_code, headers=out_headers)
