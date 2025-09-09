@@ -34,12 +34,12 @@ export function SidebarPlatformAdminButton() {
         {isInPlatformAdmin ? (
           <>
             <LogOut className="size-4" />
-            <span className={`text-sm`}>{t('Exit Platform Admin')}</span>
+            <span className={`text-sm`}>{t('Homepage')}</span>
           </>
         ) : (
           <>
             <Shield className="size-4" />
-            <span className={`text-sm`}>{t('Enter Platform Admin')}</span>
+            <span className={`text-sm`}>{t('Setup Agents')}</span>
           </>
         )}
       </div>
