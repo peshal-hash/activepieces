@@ -30,7 +30,7 @@ export const stripeHelper = (log: FastifyBaseLogger) => ({
 
         const newCustomer = await stripe.customers.create({
             email: user.email,
-            name: `${user.firstName} ${user.lastName}`, 
+            name: `${user.firstName} ${user.lastName}`,
             description: `Platform ID: ${platformId}, user ${user.id}`,
             metadata: {
                 platformId,
@@ -48,11 +48,11 @@ export const stripeHelper = (log: FastifyBaseLogger) => ({
         const redisConnection = getRedisConnection()
         const key = `trial-gift-${platformId}-${customerId}`
         const redisValue = await redisConnection.get(key)
-        const parsedGiftTrial = redisValue 
-            ? JSON.parse(redisValue) 
+        const parsedGiftTrial = redisValue
+            ? JSON.parse(redisValue)
             : null
 
-        const trialPeriod = parsedGiftTrial?.trialPeriodInUnixTime 
+        const trialPeriod = parsedGiftTrial?.trialPeriodInUnixTime
             ?? apDayjs().add(14, 'days').unix()
 
         const trialPlan = parsedGiftTrial?.trialPlan as StripePlanName
@@ -88,17 +88,17 @@ export const stripeHelper = (log: FastifyBaseLogger) => ({
             if (isNil(identity)) {
                 return { email, message: `No user exists with email: ${email}` }
             }
-                
+
             const user = await userService.getOneByIdentityIdOnly({ identityId: identity.id })
             if (isNil(user) || isNil(user.platformId) || user.platformRole !== PlatformRole.ADMIN) {
                 return { email, message: 'User doesn\'t own any platform' }
             }
-                
+
             const platformPlan = await platformPlanService(log).getOrCreateForPlatform(user.platformId)
             assertNotNullOrUndefined(platformPlan.stripeCustomerId, 'customerId is not set')
-                
+
             if (
-                isNil(platformPlan.stripeSubscriptionId) || 
+                isNil(platformPlan.stripeSubscriptionId) ||
                 platformPlan.stripeSubscriptionStatus === ApSubscriptionStatus.CANCELED
             ) {
                 const redisConnection = getRedisConnection()
@@ -180,11 +180,11 @@ export const stripeHelper = (log: FastifyBaseLogger) => ({
                     platformId,
                 },
             },
-            success_url: `${frontendUrl}/platform/setup/billing/success?action=create`,
-            cancel_url: `${frontendUrl}/platform/setup/billing/error`,
+            success_url: `${frontendUrl}/setup/billing/success?action=create`,
+            cancel_url: `${frontendUrl}/setup/billing/error`,
             customer: customerId,
         })
-        
+
         return session.url!
     },
     async createPortalSessionUrl(platformId: string): Promise<string> {
@@ -214,7 +214,7 @@ export const stripeHelper = (log: FastifyBaseLogger) => ({
 
         if (isNil(relevantSubscriptionItem)) {
             return { startDate: defaultStartDate, endDate: defaultEndDate, cancelDate: defaultCancelDate }
-        }  
+        }
 
         return { startDate: relevantSubscriptionItem.current_period_start, endDate: relevantSubscriptionItem.current_period_end, cancelDate: subscription.cancel_at ?? undefined }
     },
@@ -232,10 +232,10 @@ export const stripeHelper = (log: FastifyBaseLogger) => ({
                 customer: subscription.customer as string,
                 limit: 10,
             })
-        
-            const relevantSchedules = schedules.data.filter(schedule => 
-                schedule.subscription === subscription.id || 
-            schedule.status === 'active' || 
+
+            const relevantSchedules = schedules.data.filter(schedule =>
+                schedule.subscription === subscription.id ||
+            schedule.status === 'active' ||
             schedule.status === 'not_started',
             )
 
@@ -250,7 +250,7 @@ export const stripeHelper = (log: FastifyBaseLogger) => ({
                 if (relevantSchedules.length > 0) {
                     const schedule = relevantSchedules[0]
                     await updateSubscriptionSchedule({ stripe, scheduleId: schedule.id, subscription, newPlan, extraUserSeats, logger: log, extraActiveFlows, extraProjects, newCycle, currentCycle })
-                
+
                     for (let i = 1; i < relevantSchedules.length; i++) {
                         await stripe.subscriptionSchedules.release(relevantSchedules[i].id)
                     }
@@ -259,14 +259,14 @@ export const stripeHelper = (log: FastifyBaseLogger) => ({
                     await createSubscriptionSchedule({ stripe, subscription, newPlan, extraUserSeats, logger: log, extraActiveFlows, extraProjects, newCycle, currentCycle })
                 }
             }
-            return `/platform/setup/billing/success?action=${isUpgrade ? 'upgrade' : 'downgrade'}&plan=${newPlan}`
-     
+            return `/setup/billing/success?action=${isUpgrade ? 'upgrade' : 'downgrade'}&plan=${newPlan}`
+
         }
         catch (error) {
-            log.error(`Failed to handle subscription scheduling ${error}`, { 
-                subscriptionId, 
+            log.error(`Failed to handle subscription scheduling ${error}`, {
+                subscriptionId,
             })
-            return '/platform/setup/billing/error'
+            return '/setup/billing/error'
         }
     },
 })
@@ -279,7 +279,7 @@ async function updateSubscription(params: UpdateSubscriptionParams): Promise<voi
         expand: ['items.data.price'],
     })
 
-    const findItem = (priceIds: string[]) => 
+    const findItem = (priceIds: string[]) =>
         currentSubscription.items.data.find(item => priceIds.includes(item.price.id))
 
     const currentPlanItem = findItem([PLUS_PLAN_PRICE_ID[currentCycle], BUSINESS_PLAN_PRICE_ID[currentCycle]])
@@ -306,7 +306,7 @@ async function updateSubscription(params: UpdateSubscriptionParams): Promise<voi
     })
 
     const handleOptionalItem = (
-        quantity: number, 
+        quantity: number,
         priceId: string,
         currentItem?: Stripe.SubscriptionItem,
     ) => {
@@ -338,7 +338,7 @@ async function updateSubscription(params: UpdateSubscriptionParams): Promise<voi
 
 async function updateSubscriptionSchedule(params: UpdateSubscriptionScheduleParams): Promise<void> {
     const { extraActiveFlows, extraProjects, extraUserSeats, logger, newPlan, scheduleId, stripe, subscription, currentCycle, newCycle } = params
-    
+
     const { startDate: currentPeriodStart, endDate: currentPeriodEnd } = await stripeHelper(logger).getSubscriptionCycleDates(subscription)
     const isFreeDowngrade = newPlan === PlanName.FREE
 
@@ -377,7 +377,7 @@ async function updateSubscriptionSchedule(params: UpdateSubscriptionSchedulePara
         }))
     }
     else {
-        const currentPlan = subscription.items.data.some(item => 
+        const currentPlan = subscription.items.data.some(item =>
             [PLUS_PLAN_PRICE_ID[currentCycle], BUSINESS_PLAN_PRICE_ID[currentCycle]].includes(item.price.id),
         ) ? (subscription.items.data.some(item => item.price.id === PLUS_PLAN_PRICE_ID[currentCycle]) ? PlanName.PLUS : PlanName.BUSINESS) : PlanName.PLUS
 
@@ -396,7 +396,7 @@ async function updateSubscriptionSchedule(params: UpdateSubscriptionSchedulePara
 
     if (!isFreeDowngrade) {
         const nextPhaseItems = buildPhaseItems(newCycle, newPlan, extraUserSeats, extraProjects, extraActiveFlows)
-        
+
         phases.push({
             items: nextPhaseItems,
             start_date: currentPeriodEnd,

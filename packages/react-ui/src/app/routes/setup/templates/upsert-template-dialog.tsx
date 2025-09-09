@@ -26,7 +26,7 @@ import {
   TemplateType,
 } from '@activepieces/shared';
 
-import { Textarea } from '../../../../../components/ui/textarea';
+import { Textarea } from '../../../../components/ui/textarea';
 
 const UpsertFlowTemplateSchema = Type.Object({
   displayName: Type.String({

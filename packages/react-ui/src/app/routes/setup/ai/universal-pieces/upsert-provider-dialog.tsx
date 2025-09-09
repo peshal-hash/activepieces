@@ -30,7 +30,7 @@ import {
   SupportedAIProvider,
 } from '@activepieces/common-ai';
 
-import { ApMarkdown } from '../../../../../../components/custom/markdown';
+import { ApMarkdown } from '../../../../../components/custom/markdown';
 
 type UpsertAIProviderDialogProps = {
   provider: string;

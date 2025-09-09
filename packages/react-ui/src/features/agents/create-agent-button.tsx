@@ -43,7 +43,7 @@ export const CreateAgentButton = ({
 
   const handleConfigureClick = () => {
     setOpen(false);
-    navigate('/platform/setup/ai');
+    navigate('/setup/ai');
   };
 
   if (isAgentsConfigured) {

@@ -17,7 +17,7 @@ export const Success = () => {
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          navigate('/platform/setup/billing');
+          navigate('/setup/billing');
           return 0;
         }
         return prev - 1;
@@ -92,7 +92,7 @@ export const Success = () => {
               </Button>
 
               <Button
-                onClick={() => navigate('/platform/setup/billing')}
+                onClick={() => navigate('/setup/billing')}
                 variant="outline"
                 className="w-full"
               >

@@ -147,7 +147,7 @@ const UsageLimitsButton = React.memo(() => {
             </Button>
             <FlagGuard flag={ApFlagId.SHOW_BILLING}>
               <Link
-                to={'/platform/setup/billing'}
+                to={'/setup/billing'}
                 className={cn(
                   buttonVariants({ variant: 'outline', size: 'sm' }),
                   'w-full',
@@ -165,7 +165,7 @@ const UsageLimitsButton = React.memo(() => {
               {getTimeUntilNextReset(project.usage.nextLimitResetDate)}{' '}
             </span>
             <FlagGuard flag={ApFlagId.SHOW_BILLING}>
-              <Link to={'/platform/setup/billing'} className="w-fit">
+              <Link to={'/setup/billing'} className="w-fit">
                 <span className="text-xs text-primary underline">
                   {t('Manage')}
                 </span>

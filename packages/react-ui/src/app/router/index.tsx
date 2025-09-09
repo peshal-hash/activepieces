@@ -13,9 +13,9 @@ import AnalyticsPage from '@/app/routes/platform/analytics';
 import { ApiKeysPage } from '@/app/routes/platform/security/api-keys';
 import { SigningKeysPage } from '@/app/routes/platform/security/signing-keys';
 import { SSOPage } from '@/app/routes/platform/security/sso';
-import AIProvidersPage from '@/app/routes/platform/setup/ai';
-import { BrandingPage } from '@/app/routes/platform/setup/branding';
-import { PlatformPiecesPage } from '@/app/routes/platform/setup/pieces';
+import AIProvidersPage from '@/app/routes/setup/ai';
+import { BrandingPage } from '@/app/routes/setup/branding';
+import { PlatformPiecesPage } from '@/app/routes/setup/pieces';
 import { RedirectPage } from '@/app/routes/redirect';
 import { ProjectPiecesPage } from '@/app/routes/settings/pieces';
 import { useEmbedding } from '@/components/embed-provider';
@@ -42,16 +42,16 @@ import { FormPage } from '../routes/forms';
 import McpServersPage from '../routes/mcp-servers';
 import McpPage from '../routes/mcp-servers/id';
 import SettingsBilling from '../routes/platform/billing';
-import SettingsHealthPage from '../routes/platform/infra/health';
-import TriggerHealthPage from '../routes/platform/infra/triggers';
-import SettingsWorkersPage from '../routes/platform/infra/workers';
+import SettingsHealthPage from '../routes/infra/health';
+import TriggerHealthPage from '../routes/infra/triggers';
+import SettingsWorkersPage from '../routes/infra/workers';
 import { PlatformMessages } from '../routes/platform/notifications/platform-messages';
 import ProjectsPage from '../routes/platform/projects';
 import AuditLogsPage from '../routes/platform/security/audit-logs';
 import { ProjectRolePage } from '../routes/platform/security/project-role';
 import { ProjectRoleUsersTable } from '../routes/platform/security/project-role/project-role-users-table';
-import { GlobalConnectionsTable } from '../routes/platform/setup/connections';
-import TemplatesPage from '../routes/platform/setup/templates';
+import { GlobalConnectionsTable } from '../routes/setup/connections';
+import TemplatesPage from '../routes/setup/templates';
 import UsersPage from '../routes/platform/users';
 import { ProjectReleasesPage } from '../routes/project-release';
 import ViewRelease from '../routes/project-release/view-release';
@@ -277,6 +277,7 @@ const routes = [
       </DashboardContainer>
     ),
   }),
+
   {
     path: '/forget-password',
     element: (
@@ -428,16 +429,16 @@ const routes = [
       </PlatformAdminContainer>
     ),
   },
-  {
-    path: '/platform/setup/pieces',
+...ProjectRouterWrapper(  {
+    path: '/setup/pieces',
     element: (
-      <PlatformAdminContainer>
+      <DashboardContainer>
         <PageTitle title="Pieces">
           <PlatformPiecesPage />
         </PageTitle>
-      </PlatformAdminContainer>
+      </DashboardContainer>
     ),
-  },
+  }),
   {
     path: '/platform/analytics',
     element: (
@@ -461,8 +462,8 @@ const routes = [
       </PlatformAdminContainer>
     ),
   },
-  {
-    path: '/platform/setup/connections',
+{
+    path: '/setup/connections',
     element: (
       <PlatformAdminContainer>
         <PageTitle title="Connections">
@@ -472,7 +473,7 @@ const routes = [
     ),
   },
   {
-    path: '/platform/setup/templates',
+    path: '/setup/templates',
     element: (
       <PlatformAdminContainer>
         <PageTitle title="Templates">
@@ -482,7 +483,7 @@ const routes = [
     ),
   },
   {
-    path: '/platform/setup/branding',
+    path: '/setup/branding',
     element: (
       <PlatformAdminContainer>
         <PageTitle title="Branding">
@@ -501,16 +502,16 @@ const routes = [
       </PlatformAdminContainer>
     ),
   },
-  {
-    path: '/platform/setup/ai',
+...ProjectRouterWrapper(  {
+    path: '/setup/ai',
     element: (
-      <PlatformAdminContainer>
+      <DashboardContainer>
         <PageTitle title="AI">
           <AIProvidersPage />
         </PageTitle>
-      </PlatformAdminContainer>
+      </DashboardContainer>
     ),
-  },
+  }),
   {
     path: '/platform/security/api-keys',
     element: (
@@ -531,38 +532,38 @@ const routes = [
       </PlatformAdminContainer>
     ),
   },
-  {
-    path: '/platform/infrastructure/workers',
+...ProjectRouterWrapper(  {
+    path: '/infrastructure/workers',
     element: (
-      <PlatformAdminContainer>
+      <DashboardContainer>
         <PageTitle title="Workers">
           <SettingsWorkersPage />
         </PageTitle>
-      </PlatformAdminContainer>
+      </DashboardContainer>
     ),
-  },
-  {
-    path: '/platform/infrastructure/health',
+  }),
+...ProjectRouterWrapper(  {
+    path: '/infrastructure/health',
     element: (
-      <PlatformAdminContainer>
+      <DashboardContainer>
         <PageTitle title="System Health">
           <SettingsHealthPage />
         </PageTitle>
-      </PlatformAdminContainer>
+      </DashboardContainer>
     ),
-  },
-  {
-    path: '/platform/infrastructure/triggers',
+  }),
+...ProjectRouterWrapper(  {
+    path: '/infrastructure/triggers',
     element: (
-      <PlatformAdminContainer>
+      <DashboardContainer>
         <PageTitle title="Trigger Health">
           <TriggerHealthPage />
         </PageTitle>
-      </PlatformAdminContainer>
+      </DashboardContainer>
     ),
-  },
+  }),
   {
-    path: '/platform/setup/billing',
+    path: '/setup/billing',
     element: (
       <PlatformAdminContainer>
         <PageTitle title="Billing">
@@ -572,7 +573,7 @@ const routes = [
     ),
   },
   {
-    path: '/platform/setup/billing/success',
+    path: '/setup/billing/success',
     element: (
       <PlatformAdminContainer>
         <PageTitle title="Billing">
@@ -582,7 +583,7 @@ const routes = [
     ),
   },
   {
-    path: '/platform/setup/billing/error',
+    path: '/setup/billing/error',
     element: (
       <PlatformAdminContainer>
         <PageTitle title="Billing">
@@ -632,21 +633,21 @@ const routes = [
     ),
   },
   {
-    path: '/platform/setup',
+    path: '/setup',
     element: (
       <PlatformAdminContainer>
-        <PageTitle title="Platform Setup">
-          <Navigate to="/platform/setup/ai" replace />
+        <PageTitle title="Setup">
+          <Navigate to="/setup/ai" replace />
         </PageTitle>
       </PlatformAdminContainer>
     ),
   },
   {
-    path: '/platform/infrastructure',
+    path: '/infrastructure',
     element: (
       <PlatformAdminContainer>
-        <PageTitle title="Platform Infrastructure">
-          <Navigate to="/platform/infrastructure/workers" replace />
+        <PageTitle title="Infrastructure">
+          <Navigate to="/infrastructure/workers" replace />
         </PageTitle>
       </PlatformAdminContainer>
     ),

@@ -81,7 +81,7 @@ export const notificationHooks = {
             "We noticed you haven't set up any AI providers yet. To unlock Universal AI pieces for your team, you'll need to configure some provider credentials first.",
           ),
           actionText: t('Configure'),
-          actionLink: '/platform/setup/ai',
+          actionLink: '/setup/ai',
         });
       }
 

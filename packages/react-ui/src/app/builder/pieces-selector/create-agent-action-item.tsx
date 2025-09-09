@@ -86,7 +86,7 @@ const CreateAgentActionItem = ({
                     <ToastAction
                       altText="Try again"
                       onClick={() => {
-                        navigate('/platform/setup/ai');
+                        navigate('/setup/ai');
                       }}
                     >
                       {t('Set Up')}

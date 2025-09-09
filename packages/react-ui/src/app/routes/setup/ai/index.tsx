@@ -9,7 +9,7 @@ import { userHooks } from '@/hooks/user-hooks';
 import { SUPPORTED_AI_PROVIDERS } from '@activepieces/common-ai';
 import { PlatformRole, ApFlagId, ApEdition } from '@activepieces/shared';
 
-import LockedFeatureGuard from '../../../../components/locked-feature-guard';
+import LockedFeatureGuard from '../../../components/locked-feature-guard';
 
 import { CopilotSetup } from './copilot';
 import { AIProviderCard } from './universal-pieces/ai-provider-card';

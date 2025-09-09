@@ -63,14 +63,14 @@ export default function Billing() {
       { plan: PlanName.BUSINESS },
       {
         onSuccess: () => {
-          navigate('/platform/setup/billing/success');
+          navigate('/setup/billing/success');
           toast({
             title: t('Success'),
             description: t('Business trial started successfully'),
           });
         },
         onError: () => {
-          navigate(`/platform/setup/billing/error`);
+          navigate(`/setup/billing/error`);
         },
       },
     );

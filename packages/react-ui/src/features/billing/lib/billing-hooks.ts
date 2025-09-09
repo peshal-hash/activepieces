@@ -46,7 +46,7 @@ export const billingMutations = {
         });
       },
       onError: () => {
-        navigate(`/platform/setup/billing/error`);
+        navigate(`/setup/billing/error`);
       },
     });
   },
