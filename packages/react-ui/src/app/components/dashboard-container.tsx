@@ -122,24 +122,24 @@ export function DashboardContainer({ children }: DashboardContainerProps) {
     tutorialTab: 'tables',
   };
 
-  const todosLink: SidebarLink = {
-    type: 'link',
-    to: authenticationSession.appendProjectRoutePrefix('/todos'),
-    label: t('Todos'),
-    show: platform.plan.todosEnabled || !embedState.isEmbedded,
-    icon: <ListTodo />,
-    hasPermission: checkAccess(Permission.READ_TODOS),
-    isSubItem: false,
-    tutorialTab: 'todos',
-  };
+  // const todosLink: SidebarLink = {
+  //   type: 'link',
+  //   to: authenticationSession.appendProjectRoutePrefix('/todos'),
+  //   label: t('Todos'),
+  //   show: platform.plan.todosEnabled || !embedState.isEmbedded,
+  //   icon: <ListTodo />,
+  //   hasPermission: checkAccess(Permission.READ_TODOS),
+  //   isSubItem: false,
+  //   tutorialTab: 'todos',
+  // };
 
   const items: SidebarItem[] = [
     flowsLink,
-    // agentsLink,
+    agentsLink,
     tablesLink,
-    mcpLink,
-    todosLink,
-    releasesLink,
+    mcpLink
+    // todosLink,
+    // releasesLink,
   ].filter(permissionFilter);
 
   return (
