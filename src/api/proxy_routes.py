@@ -23,7 +23,7 @@ router = APIRouter()
 # Shared token management (global fallback; prefer cookie)
 # =========================================================
 
-async def _resolve_auth_from(request: Request) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def _resolve_auth_from(request: Request) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
     Prefer request cookies; if not present, fall back to module-level globals.
     Reading globals is guarded by a lock to avoid torn reads while /workflow is writing.
@@ -108,12 +108,18 @@ def url_rewrite(content, content_type: str, token_to_inject: Optional[str]):
 
     return content
 
+def _is_https(request: Request) -> bool:
+    # If behind a reverse proxy that terminates TLS, trust X-Forwarded-Proto
+    xf_proto = request.headers.get("x-forwarded-proto")
+    if xf_proto:
+        return xf_proto.lower() == "https"
+    return request.url.scheme == "https"
 # =========================================================
 # 1) Auth bootstrap
 # =========================================================
 
 @router.post("/workflow")
-async def workflow(payload: WorkflowPayload):
+async def workflow(payload: WorkflowPayload,request: Request):
     # STEP 1: Add print statements to see if the endpoint is hit and what data is received.
     print("--- ✅ /workflow endpoint was called! ---")
     print(f"Received payload: {payload.model_dump_json()}")
@@ -146,24 +152,31 @@ async def workflow(payload: WorkflowPayload):
         raise HTTPException(status_code=500, detail="Failed to get token after auth flow")
 
     resp = JSONResponse(content={"success": True, "redirectUrl": config.AP_PROXY_URL})
-    common = dict(
-        httponly=True,          # yes for secrets
-        secure=True,            # required when SameSite=None (use HTTPS locally too)
-        samesite="None",        # critical for cross-site fetch
-        max_age=60*60,
+    is_https = _is_https(request)
+    if is_https:
+        samesite = "None"
+        secure = True
+    else:
+        samesite = "Lax"    # allows top-level navigation + same-site XHR
+        secure  = False
+    cookie_args = dict(
+        httponly=True,
+        secure=secure,
+        samesite=samesite,
         path="/",
+        max_age=0,
     )
-    resp.set_cookie("ap_token", token, **common)
-    resp.set_cookie("ap_project_id", projectId or "", **common)
-    resp.set_cookie("ap_platform_id", platformId or "", **common)
+    resp.set_cookie("ap_token", token, **cookie_args)
+    resp.set_cookie("ap_project_id", projectId or "", **cookie_args)
+    resp.set_cookie("ap_platform_id", platformId or "", **cookie_args)
 
     # Optional: a non-HttpOnly helper for client code (OK if it’s non-sensitive)
-    resp.set_cookie("ap_session_born", "1",**common)
+    resp.set_cookie("ap_session_born", "1",**cookie_args)
     return resp
 
 
 @router.get("/logout")
-async def logout():
+async def logout(request: Request):
     """
     Log out of the proxied Activepieces session and aggressively clear
     client-side state so stale flow routes/IDs aren't reused across users.
@@ -214,10 +227,17 @@ async def logout():
 
     # 4) Expire all auth/correlation cookies for this origin
     # Make sure these attributes (domain/path/secure/samesite) match how you originally set them.
+    is_https = _is_https(request)
+    if is_https:
+        samesite = "None"
+        secure = True
+    else:
+        samesite = "Lax"    # allows top-level navigation + same-site XHR
+        secure  = False
     cookie_args = dict(
         httponly=True,
-        secure=True,
-        samesite="None",
+        secure=secure,
+        samesite=samesite,
         path="/",
         max_age=0,
     )
@@ -250,7 +270,7 @@ async def v1_webhook_handler(request: Request, rest_of_path: str):
     headers.setdefault("X-Forwarded-For", request.client.host if request.client else "")
 
     # 2) Attach auth if we have it
-    tok, _, _ = await _resolve_auth_from(request)
+    tok, _, _ = _resolve_auth_from(request)
     if tok:
         headers["Authorization"] = f"Bearer {tok}"
 
@@ -421,7 +441,7 @@ async def ap_proxy(request: Request, rest: str = ""):
     headers.setdefault("X-Forwarded-For", request.client.host if request.client else "")
 
     # Prefer cookie token; fall back to globals (resolved atomically)
-    token, cookie_pid, cookie_platform_id = await _resolve_auth_from(request)
+    token, cookie_pid, cookie_platform_id = _resolve_auth_from(request)
 
     print("***********************************************************")
     print(f"token:  {token}")
