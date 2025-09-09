@@ -24,12 +24,14 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuSubItem,
   SidebarMenuSub,
   SidebarMenuItem,
+  SidebarGroupContent,
   SidebarMenuAction,
   SidebarSeparator,
 } from '@/components/ui/sidebar-shadcn';
@@ -48,7 +50,14 @@ import { SidebarInviteUserButton } from './sidebar-invite-user';
 import { SidebarPlatformAdminButton } from './sidebar-platform-admin';
 import { SidebarUser } from './sidebar-user';
 import UsageLimitsButton from './usage-limits-button';
-
+import {
+  LayoutGrid,
+  LineChart,
+  Server,
+  Shield,
+  Users,
+  Wrench,
+} from 'lucide-react';
 type Link = {
   icon: React.ReactNode;
   label: string;
@@ -151,14 +160,26 @@ export type SidebarGroup = {
   icon: React.ElementType;
   items: SidebarLink[];
   type: 'group';
-  defaultOpen: boolean;
   open: boolean;
   setOpen: (open: boolean) => void;
   isActive?: (pathname: string) => boolean;
   separatorBefore?: boolean;
   separatorAfter?: boolean;
 };
-
+export type SidebarGroupItem = {
+   name?: string;
+   putEmptySpaceTop?: boolean;
+   label: string;
+   icon: React.ElementType;
+   items: SidebarLink[];
+   type: 'group';
+   open: boolean;
+   setOpen: (open: boolean) => void;
+   isActive?: (pathname: string) => boolean;
+   separatorBefore?: boolean;
+   separatorAfter?: boolean;
+   defaultOpen?: boolean; // <- allow config files to set an initial open state
+ };
 export type SidebarLink = {
   to: string;
   label: string;
@@ -176,7 +197,7 @@ export type SidebarLink = {
   tutorialTab?: TabType;
 };
 
-export type SidebarItem = SidebarLink | SidebarGroup;
+export type SidebarItem = SidebarLink | SidebarGroupItem;
 
 type SidebarProps = {
   children: React.ReactNode;
@@ -216,27 +237,88 @@ export function SidebarComponent({
                       <React.Fragment key={item.label}>
                         {item.separatorBefore && <SidebarSeparator />}
                         {item.type === 'group'
-                          ? ApSidebarMenuGroup(item)
-                          : ApSidebarMenuItem(item, index)}
+                          ? ApSidebarMenuGroup(item as SidebarGroupItem)
+                          : ApSidebarMenuItem(item as SidebarLink, index)}
                         {item.separatorAfter && <SidebarSeparator />}
                       </React.Fragment>
                     ))}
 
                     <SidebarGroup>
-                      <SidebarGroupLabel>{t('Misc')}</SidebarGroupLabel>
-                      <SidebarMenu>
-                        {/* <SidebarMenuItem>
+                      <SidebarGroupLabel>
+                        <div className="flex items-center gap-2">
+                          <span>{t('Misc')}</span>
+                        </div>
+                      </SidebarGroupLabel>
+                      <SidebarGroupContent>
+                       <SidebarMenu>
+                        {/* Setup AI link */}
+                        <SidebarMenuItem>
                           <SidebarMenuButton asChild>
-                            <SidebarPlatformAdminButton />
+                            <CustomTooltipLink
+                              to={authenticationSession.appendProjectRoutePrefix("/setup/ai")}
+                              label={t('Setup AI')}
+                              Icon={<Wrench className="size-4" />}
+                              isSubItem={false}
+                            />
                           </SidebarMenuButton>
-                        </SidebarMenuItem> */}
+                        </SidebarMenuItem>
+
+
+                        <SidebarMenuItem>
+                        <Collapsible defaultOpen={false} className="group/collapsible">
+                            <CollapsibleTrigger asChild>
+                              <SidebarMenuButton className="gap-2 px-2 py-1">
+                                <Server className="size-4 shrink-0 [stroke-width:2]" />
+                                <span>{t("Infrastructure")}</span>
+                                <SidebarMenuAction>
+                                  <ChevronDownIcon className="transition-transform duration-200 group-data-[state=open]/infra:rotate-180" />
+                                </SidebarMenuAction>
+                              </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub className="pl-3">
+                              <SidebarMenuSubItem>
+                                <SidebarMenuButton asChild className="gap-2 px-2 py-1">
+                                  <CustomTooltipLink
+                                    to={authenticationSession.appendProjectRoutePrefix("/infrastructure/workers")}
+                                    label={t("Workers")}
+                                    Icon={<Users className="size-4 shrink-0 [stroke-width:2]" />}
+                                    isSubItem={true}
+                                  />
+                                </SidebarMenuButton>
+                              </SidebarMenuSubItem>
+
+                              <SidebarMenuSubItem>
+                                <SidebarMenuButton asChild className="gap-2 px-2 py-1">
+                                  <CustomTooltipLink
+                                    to={authenticationSession.appendProjectRoutePrefix("/infrastructure/health")}
+                                    label={t("Health")}
+                                    Icon={<Shield className="size-4 shrink-0 [stroke-width:2]" />}
+                                    isSubItem={true}
+                                  />
+                                </SidebarMenuButton>
+                              </SidebarMenuSubItem>
+
+                              <SidebarMenuSubItem>
+                                <SidebarMenuButton asChild className="gap-2 px-2 py-1">
+                                  <CustomTooltipLink
+                                    to={authenticationSession.appendProjectRoutePrefix("/infrastructure/triggers")}
+                                    label={t("Triggers")}
+                                    Icon={<LineChart className="size-4 shrink-0 [stroke-width:2]" />}
+                                    isSubItem={true}
+                                  />
+                                </SidebarMenuButton>
+                              </SidebarMenuSubItem>
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </Collapsible>
+                        </SidebarMenuItem>
+
                         {showConnectionsLink && (
                           <SidebarMenuItem>
                             <SidebarMenuButton asChild>
                               <CustomTooltipLink
-                                to={authenticationSession.appendProjectRoutePrefix(
-                                  '/connections',
-                                )}
+                                to={authenticationSession.appendProjectRoutePrefix('/connections')}
                                 label={t('Connections')}
                                 Icon={<Link2 className="size-4" />}
                                 isSubItem={false}
@@ -244,22 +326,8 @@ export function SidebarComponent({
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         )}
-                        {/* {showTutorials && (
-                          <SidebarMenuItem>
-                            <SidebarMenuButton asChild>
-                              <TutorialsDialog
-                                location="tutorials-sidebar-item"
-                                showTooltip={false}
-                              >
-                                <div className="flex items-center gap-2 text-sm px-2 py-1.5 cursor-pointer hover:bg-sidebar-accent rounded-sm transition-colors">
-                                  <VideoIcon className="size-4"></VideoIcon>
-                                  <span>{t('Tutorials')}</span>
-                                </div>
-                              </TutorialsDialog>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        )} */}
                       </SidebarMenu>
+                      </SidebarGroupContent>
                     </SidebarGroup>
                   </div>
                 </ScrollArea>
@@ -333,8 +401,7 @@ function ApSidebarMenuItem(item: SidebarLink, index: number) {
     </React.Fragment>
   );
 }
-
-function ApSidebarMenuGroup(item: SidebarGroup) {
+function ApSidebarMenuGroup(item: SidebarGroupItem) {
   const location = useLocation();
   return (
     <React.Fragment key={item.label}>
@@ -342,11 +409,10 @@ function ApSidebarMenuGroup(item: SidebarGroup) {
         {item.name && <SidebarGroupLabel>{item.name}</SidebarGroupLabel>}
         <SidebarMenu>
           <Collapsible
-            defaultOpen={item.defaultOpen || item.isActive?.(location.pathname)}
+            open={item.open}
+            defaultOpen={item.defaultOpen ?? item.isActive?.(location.pathname) ?? false}
+            onOpenChange={item.setOpen}
             className="group/collapsible"
-            onOpenChange={(open) => {
-              item.setOpen(open);
-            }}
           >
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
@@ -358,6 +424,7 @@ function ApSidebarMenuGroup(item: SidebarGroup) {
                   </SidebarMenuAction>
                 </SidebarMenuButton>
               </CollapsibleTrigger>
+
               <CollapsibleContent>
                 <SidebarMenuSub>
                   {item.items.map(
