@@ -266,7 +266,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_FLOW_TIMEOUT_SECONDS'
-              value: '600'
+              value: '1800'
             }
             {
               name: 'AP_TELEMETRY_ENABLED'
