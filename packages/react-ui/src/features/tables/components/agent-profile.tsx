@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
+import favicon from "../../../assets/img/logo/favicon.png";
 interface AgentProfileProps {
   imageUrl?: string;
   isEnabled?: boolean;
@@ -11,7 +11,7 @@ interface AgentProfileProps {
 }
 
 const AgentProfile = ({
-  imageUrl = 'https://cdn.activepieces.com/quicknew/agents/robots/robot_186.png',
+  imageUrl = favicon,
   isEnabled = false,
   onClick,
   className,

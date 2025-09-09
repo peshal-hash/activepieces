@@ -15,7 +15,6 @@ import { mcpService } from '../mcp/mcp-service'
 import { projectService } from '../project/project-service'
 import { AgentEntity } from './agent-entity'
 import { agentRunsService } from './agent-runs/agent-runs-service'
-
 export const agentRepo = repoFactory(AgentEntity)
 
 export const agentsService = (log: FastifyBaseLogger) => ({
@@ -189,8 +188,17 @@ async function enrichAgent(agent: Omit<Agent, 'runCompleted'>, log: FastifyBaseL
 }
 
 function getAgentProfilePictureUrl(): string {
-    return `https://cdn.activepieces.com/quicknew/agents/robots/robot_${Math.floor(Math.random() * 10000)}.png`
+  const API_BASE_URL = process.env.AP_PROXY_URL
+  if (!API_BASE_URL) {
+    // Fail loudly so misconfiguration is obvious in non-local environments.
+    // You can replace this with a sensible default if preferred.
+    throw new Error(
+      'AP_PROXY_URL is not set. Please set it to your API base URL (e.g., https://api.example.com)',
+    )
+  }
+  return new URL('/static/favicon.png', API_BASE_URL).toString()
 }
+
 
 function getEnhancementPrompt(originalPrompt: string) {
     return {

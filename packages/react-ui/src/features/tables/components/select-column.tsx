@@ -4,7 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
 import { Row } from '../lib/types';
-
+import favicon from '@/assets/img/logo/favicon.png';
 export function SelectHeaderCell() {
   const { isRowSelected, onRowSelectionChange } = useHeaderRowSelection();
 
@@ -74,7 +74,7 @@ export function SelectCell({
       >
         {locked ? (
           <img
-            src="https://cdn.activepieces.com/quicknew/agents/robots/robot_186.png"
+            src={favicon}
             alt="Locked"
             className="w-6 h-6 rounded-full object-cover"
             style={{ display: 'inline-block' }}

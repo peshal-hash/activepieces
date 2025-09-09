@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-
+import facicon from "@/assets/img/logo/favicon.png"
 function getAgentProfilePictureUrl(): string {
-  return `https://cdn.activepieces.com/quicknew/agents/robots/robot_${Math.floor(
-    Math.random() * 10000,
-  )}.png`;
+  return facicon;
 }
 
 interface AgentImageLoadingProps {

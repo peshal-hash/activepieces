@@ -7,6 +7,9 @@ import { createAdapter } from '@socket.io/redis-adapter'
 import { FastifyInstance, FastifyRequest, HTTPMethods } from 'fastify'
 import fastifySocketIO from 'fastify-socket'
 import { Socket } from 'socket.io'
+import path from 'path';
+import fastifyStatic from '@fastify/static';
+import fastify from 'fastify';
 import { agentModule } from './agents/agent-module'
 import { agentRunsModule } from './agents/agent-runs/agent-runs-module'
 import { aiProviderModule } from './ai/ai-provider.module'
@@ -215,7 +218,7 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
     await app.register(todoActivityModule)
     await app.register(agentRunsModule)
     await app.register(solutionsModule)
-    
+
     app.get(
         '/redirect',
         async (
@@ -255,6 +258,15 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
 
     app.io.on('connection', (socket: Socket) => rejectedPromiseHandler(websocketService.init(socket, app.log), app.log))
     app.io.on('disconnect', (socket: Socket) => rejectedPromiseHandler(websocketService.onDisconnect(socket), app.log))
+    const STATIC_DIR = path.resolve(
+    __dirname,
+    '../../../../react-ui/public/static'
+    );
+
+    await app.register(fastifyStatic, {
+    root: STATIC_DIR,
+    prefix: '/static/', // served at https://api.example.com/static/*
+    });
 
     await validateEnvPropsOnStartup(app.log)
 
