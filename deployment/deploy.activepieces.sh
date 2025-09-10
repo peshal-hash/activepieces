@@ -71,12 +71,6 @@ function deploy_infrastructure() {
 
     # Define secrets and keys directly in the script
     local POSTGRES_PASSWORD="SalesOptAi123"
-    local API_KEY
-    API_KEY=$(openssl rand -hex 64)
-    local ENCRYPTION_KEY
-    ENCRYPTION_KEY=$(openssl rand -hex 16)
-    local JWT_SECRET
-    JWT_SECRET=$(openssl rand -hex 32)
 
     if ! az deployment group create \
       --name "$DEPLOYMENT_NAME" \
