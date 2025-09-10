@@ -26,4 +26,4 @@ SALESOPTAI_APIS="https://gentle-grass-02d3f240f.1.azurestaticapps.net"
 # SALESOPTAI_APIS="https://gentle-grass-02d3f240f.1.azurestaticapps.net"
 
 #make sure we don't deploy any new infrastructure.
-DEPLOY_NEW_INFRA='false'
+DEPLOY_NEW_INFRA='true'
