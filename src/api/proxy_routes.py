@@ -162,7 +162,7 @@ async def workflow(payload: WorkflowPayload,request: Request):
     # encoded_jwt = jwt.encode(data_to_encode, config.JWT_SECRET_KEY, algorithm=config.JWT_ALGORITHM)
 
     # Append the JWT as a query parameter to the redirect URL
-    redirect_params = {"ap_token": token,"ap_project_id": projectId,"ap_platform_id": platformId}
+    redirect_params = {"ap_token": token}
     redirect_url_with_token = f"{config.AP_PROXY_URL.rstrip('/')}?{urlencode(redirect_params)}"
     resp = JSONResponse(content={"success": True, "redirectUrl": redirect_url_with_token})
     return resp
@@ -244,104 +244,6 @@ async def logout(request: Request):
     return resp
 
 
-
-# =========================================================
-# 2) Specific Webhook Handler (HTTP → HTTP)
-# =========================================================
-# =========================================================
-# 2) Specific Webhook Handler (HTTP → HTTP)  — hardened
-# =========================================================
-@router.api_route("/v1/webhooks/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
-async def v1_webhook_handler(request: Request, rest_of_path: str):
-    print("\n✅ --- HTTP Webhook Intercepted! --- ✅")
-    full_url = f"{config.AP_BASE.rstrip('/')}/v1/webhooks/{rest_of_path}"
-    token = None
-    projectId = None
-    platformId = None
-    # 1) Build outbound headers first (fixes NameError and hop-by-hop leakage)
-    headers = _filtered_outgoing_headers(dict(request.headers))
-    headers.setdefault("X-Forwarded-Proto", request.url.scheme)
-    headers.setdefault("X-Forwarded-Host", request.headers.get("host", ""))
-    headers.setdefault("X-Forwarded-For", request.client.host if request.client else "")
-
-
-    # --- NEW: Check for JWT in query parameters first ---
-    token_from_query = request.query_params.get("ap_token")
-    project_id_from_query = request.query_params.get("ap_project_id")
-    platform_id_from_query = request.query_params.get("ap_platform_id")
-
-    if token_from_query:
-        print("--- Found auth credentials in URL query parameters. Using them directly. ---")
-        token = token_from_query
-        # Use .get() to handle cases where they might be missing or empty
-        projectId = project_id_from_query
-        platformId = platform_id_from_query
-    else:
-        # --- FALLBACK: If no credentials in URL, use the existing cookie logic ---
-        print("--- No auth credentials in URL, falling back to cookies ---")
-        token, projectId, platformId = _resolve_auth_from(request)
-
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-
-    # 3) Body + params (DON’T send a naked "?" if empty)
-    body = await request.body()
-    q_params = dict(request.query_params)
-    params = q_params if q_params else None
-
-    # 4) Debug
-    try:
-        from urllib.parse import urlencode
-        print(f"[UPSTREAM REQ] {request.method} {full_url}" + (f"?{urlencode(q_params, doseq=True)}" if q_params else ""))
-    except Exception:
-        pass
-
-    # 5) Send upstream
-    try:
-        async with httpx.AsyncClient(timeout=config.TIMEOUT, follow_redirects=False) as client:
-            resp = await client.request(
-                method=request.method,
-                url=full_url,
-                headers=headers,
-                params=params,          # <- None when empty to avoid "?"
-                content=body,
-                cookies=request.cookies,
-            )
-    except httpx.RequestError as e:
-        return Response(content=f"Proxy connection error on webhook: {e}", status_code=502)
-
-    # 6) Filter unsafe headers on the way back
-    excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
-    out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
-    resp=Response(content=resp.content, status_code=resp.status_code, headers=out_headers)
-    is_https = _is_https(request)
-    if is_https:
-        samesite = "None"
-        secure = True
-    else:
-        samesite = "Lax"    # allows top-level navigation + same-site XHR
-        secure  = False
-    cookie_args = dict(
-        httponly=True,
-        secure=secure,
-        samesite=samesite,
-        path="/",
-        max_age=0,
-    )
-    resp.set_cookie("ap_token", token, **cookie_args)
-    resp.set_cookie("ap_project_id", projectId or "", **cookie_args)
-    resp.set_cookie("ap_platform_id", platformId or "", **cookie_args)
-
-    # Optional: a non-HttpOnly helper for client code (OK if it’s non-sensitive)
-    resp.set_cookie("ap_session_born", "1",**cookie_args)
-
-    return resp
-# =========================================================
-# WebSocket tunnel — robust to client disconnects
-# =========================================================
-# =========================================================
-# WebSocket tunnel — robust to client disconnects
-# =========================================================
 @router.websocket("/{rest:path}")
 async def websocket_proxy(websocket: WebSocket, rest: str):
     """
@@ -449,9 +351,36 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
                 pass
         print(f"WS tunnel closed with code: {close_code}")
 
-# =========================================================
-# 4) Generic HTTP Proxy (Catch-All) with flags fix + safe token
-# =========================================================
+
+
+@router.api_route("/assets/{rest:path}", methods=["GET"])
+async def proxy_static_assets(request: Request, rest: str):
+    """
+    This route specifically handles requests for static assets.
+    It does NOT perform authentication and simply forwards the request.
+    """
+    print(f"--- Asset proxy hit for: /assets/{rest} ---")
+
+    headers = _filtered_outgoing_headers(dict(request.headers))
+    full_url = f"{config.AP_BASE.rstrip('/')}/assets/{rest}"
+
+    try:
+        # Use httpx.AsyncClient for async requests
+        async with httpx.AsyncClient(timeout=config.TIMEOUT) as client:
+            resp = await client.get(full_url, headers=headers)
+
+        # The url_rewrite is still useful for rewriting any URLs inside JS/CSS files
+        content = url_rewrite(resp.content, resp.headers.get("Content-Type", ""), None)
+
+        excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+        out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
+
+        return Response(content=content, status_code=resp.status_code, headers=out_headers)
+
+    except httpx.RequestError as e:
+        return Response(content=f"Proxy connection error for asset: {e}", status_code=502)
+
+
 @router.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def ap_proxy(request: Request, rest: str = ""):
     # --- Parse/merge any accidental query string that snuck into `rest` ---
@@ -478,9 +407,6 @@ async def ap_proxy(request: Request, rest: str = ""):
 
     body = await request.body()
     modified_body = body
-    req_content_type = request.headers.get("content-type", "")
-
-
 
     # --------------------------
     # Start with query params: merge real query with any extra_qs from rest
@@ -491,22 +417,53 @@ async def ap_proxy(request: Request, rest: str = ""):
         for k, v in extra_qs.items():
             q_params.setdefault(k, v)
 
-
     # --- NEW: Check for JWT in query parameters first ---
     token_from_query = request.query_params.get("ap_token")
-    project_id_from_query = request.query_params.get("ap_project_id")
-    platform_id_from_query = request.query_params.get("ap_platform_id")
+
+    auth_header = request.headers.get("Authorization")
 
     if token_from_query:
-        print("--- Found auth credentials in URL query parameters. Using them directly. ---")
         token = token_from_query
-        # Use .get() to handle cases where they might be missing or empty
-        cookie_pid = project_id_from_query
-        cookie_platform_id = platform_id_from_query
+
+    elif auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split("Bearer ")[1]
+        print("--- Found JWT in Authorization header. ---")
     else:
-        # --- FALLBACK: If no credentials in URL, use the existing cookie logic ---
-        print("--- No auth credentials in URL, falling back to cookies ---")
-        token, cookie_pid, cookie_platform_id = _resolve_auth_from(request)
+        token=None
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication token not found.")
+
+    if token:
+        # Use .get() to handle cases where they might be missing or empty
+        try:
+            # Verify the token's signature and expiration, and decode it
+            payload = jwt.decode(
+                token,
+                config.JWT_SECRET_KEY,
+                algorithms=[config.JWT_ALGORITHM]
+            )
+            cookie_pid = payload.get("projectId")
+            platform_object = payload.get("platform")
+
+            if platform_object and isinstance(platform_object, dict):
+                cookie_platform_id = platform_object.get("id")
+            # Extract the credentials from the token's payload
+            print("********************************************************")
+            print(payload)
+            print("********************************************************")
+
+            if not token:
+                raise HTTPException(status_code=401, detail="Invalid token payload.")
+        except JWTError as e:
+            # This handles expired tokens, invalid signatures, etc.
+            print(f"JWT decoding failed: {e}")
+            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+
+
+            print("JWT decoded successfully. Using credentials from token.")
+    else:
+        print(f"JWT decoding failed: {e}")
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
 
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -595,7 +552,6 @@ async def ap_proxy(request: Request, rest: str = ""):
             headers=headers,
             params=(q_params or None),
             data=modified_body,
-            cookies=request.cookies,
             allow_redirects=False,
             timeout=config.TIMEOUT,
         )
@@ -613,26 +569,4 @@ async def ap_proxy(request: Request, rest: str = ""):
     rewritten_content = url_rewrite(resp.content, resp_content_type, token)
     excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
     out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
-    resp=Response(content=rewritten_content, status_code=resp.status_code, headers=out_headers)
-    is_https = _is_https(request)
-    if is_https:
-        samesite = "None"
-        secure = True
-    else:
-        samesite = "Lax"    # allows top-level navigation + same-site XHR
-        secure  = False
-    cookie_args = dict(
-        httponly=True,
-        secure=secure,
-        samesite=samesite,
-        path="/",
-        max_age=0,
-    )
-    resp.set_cookie("ap_token", token, **cookie_args)
-    resp.set_cookie("ap_project_id", cookie_pid or "", **cookie_args)
-    resp.set_cookie("ap_platform_id", cookie_platform_id or "", **cookie_args)
-
-    # Optional: a non-HttpOnly helper for client code (OK if it’s non-sensitive)
-    resp.set_cookie("ap_session_born", "1",**cookie_args)
-
-    return resp
+    return Response(content=rewritten_content, status_code=resp.status_code, headers=out_headers)
