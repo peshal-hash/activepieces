@@ -152,17 +152,17 @@ async def workflow(payload: WorkflowPayload,request: Request):
     platformId=ap_data.get("platformId")
     if not token:
         raise HTTPException(status_code=500, detail="Failed to get token after auth flow")
-    expire = datetime.utcnow() + timedelta(minutes=5)
-    data_to_encode = {
-        "ap_token": token,
-        "ap_project_id": projectId,
-        "ap_platform_id": platformId,
-        "exp": expire,
-    }
-    encoded_jwt = jwt.encode(data_to_encode, config.JWT_SECRET_KEY, algorithm=config.JWT_ALGORITHM)
+    # expire = datetime.utcnow() + timedelta(minutes=5)
+    # data_to_encode = {
+    #     "ap_token": token,
+    #     "ap_project_id": projectId,
+    #     "ap_platform_id": platformId,
+    #     "exp": expire,
+    # }
+    # encoded_jwt = jwt.encode(data_to_encode, config.JWT_SECRET_KEY, algorithm=config.JWT_ALGORITHM)
 
     # Append the JWT as a query parameter to the redirect URL
-    redirect_params = {"auth_token": encoded_jwt}
+    redirect_params = {"ap_token": token,"ap_project_id": projectId,"ap_platform_id": platformId}
     redirect_url_with_token = f"{config.AP_PROXY_URL.rstrip('/')}?{urlencode(redirect_params)}"
     resp = JSONResponse(content={"success": True, "redirectUrl": redirect_url_with_token})
     return resp
@@ -266,30 +266,19 @@ async def v1_webhook_handler(request: Request, rest_of_path: str):
 
 
     # --- NEW: Check for JWT in query parameters first ---
-    auth_token_from_query = request.query_params.get("auth_token")
-    if auth_token_from_query:
-        print("--- Found auth_token in URL, attempting to decode JWT ---")
-        try:
-            payload = jwt.decode(
-                auth_token_from_query,
-                config.JWT_SECRET_KEY,
-                algorithms=[config.JWT_ALGORITHM]
-            )
-            token = payload.get("ap_token")
-            projectId = payload.get("ap_project_id")
-            platformId = payload.get("ap_platform_id")
+    token_from_query = request.query_params.get("ap_token")
+    project_id_from_query = request.query_params.get("ap_project_id")
+    platform_id_from_query = request.query_params.get("ap_platform_id")
 
-            if not token:
-                raise HTTPException(status_code=401, detail="Invalid token payload: missing ap_token")
-
-            print("JWT decoded successfully. Using token from URL.")
-
-        except JWTError as e:
-            # This handles expired tokens, invalid signatures, etc.
-            print(f"JWT decoding failed: {e}")
-            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+    if token_from_query:
+        print("--- Found auth credentials in URL query parameters. Using them directly. ---")
+        token = token_from_query
+        # Use .get() to handle cases where they might be missing or empty
+        projectId = project_id_from_query
+        platformId = platform_id_from_query
     else:
-        print("--- No auth_token in URL, falling back to cookies ---")
+        # --- FALLBACK: If no credentials in URL, use the existing cookie logic ---
+        print("--- No auth credentials in URL, falling back to cookies ---")
         token, projectId, platformId = _resolve_auth_from(request)
 
     if token:
@@ -468,8 +457,9 @@ async def ap_proxy(request: Request, rest: str = ""):
     # --- Parse/merge any accidental query string that snuck into `rest` ---
     # FastAPI normally strips it, but hardening for safety:
     from urllib.parse import parse_qsl, urlencode
-
-
+    token=None
+    cookie_pid=None
+    cookie_platform_id=None
     extra_qs = {}
     if "?" in rest:
         path_only, qs = rest.split("?", 1)
@@ -503,30 +493,19 @@ async def ap_proxy(request: Request, rest: str = ""):
 
 
     # --- NEW: Check for JWT in query parameters first ---
-    auth_token_from_query = request.query_params.get("auth_token")
-    if auth_token_from_query:
-        print("--- Found auth_token in URL, attempting to decode JWT ---")
-        try:
-            payload = jwt.decode(
-                auth_token_from_query,
-                config.JWT_SECRET_KEY,
-                algorithms=[config.JWT_ALGORITHM]
-            )
-            token = payload.get("ap_token")
-            cookie_pid = payload.get("ap_project_id")
-            cookie_platform_id = payload.get("ap_platform_id")
+    token_from_query = request.query_params.get("ap_token")
+    project_id_from_query = request.query_params.get("ap_project_id")
+    platform_id_from_query = request.query_params.get("ap_platform_id")
 
-            if not token:
-                raise HTTPException(status_code=401, detail="Invalid token payload: missing ap_token")
-
-            print("JWT decoded successfully. Using token from URL.")
-
-        except JWTError as e:
-            # This handles expired tokens, invalid signatures, etc.
-            print(f"JWT decoding failed: {e}")
-            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+    if token_from_query:
+        print("--- Found auth credentials in URL query parameters. Using them directly. ---")
+        token = token_from_query
+        # Use .get() to handle cases where they might be missing or empty
+        cookie_pid = project_id_from_query
+        cookie_platform_id = platform_id_from_query
     else:
-        print("--- No auth_token in URL, falling back to cookies ---")
+        # --- FALLBACK: If no credentials in URL, use the existing cookie logic ---
+        print("--- No auth credentials in URL, falling back to cookies ---")
         token, cookie_pid, cookie_platform_id = _resolve_auth_from(request)
 
     if token:
