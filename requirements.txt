@@ -9,3 +9,4 @@ python-dotenv
 # Add proper async websockets support (needed for proxy)
 websockets>=11.0
 python-socketio
+python-jose[cryptography]

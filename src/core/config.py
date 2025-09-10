@@ -29,3 +29,11 @@ CORS_ORIGINS: list = [origin.strip() for origin in CORS_ORIGINS_STR.split(',')]
 #frontend url
 AP_FRONTEND_URL:str=os.environ.get("AP_FRONTEND_URL", "http://localhost:5000")
 AP_PROXY_URL:str=os.environ.get("AP_PROXY_URL", "http://localhost:5000")
+TIMEOUT = int(os.getenv("TIMEOUT", "30"))
+
+
+# --- NEW: JWT Configuration ---
+# This should be a long, random, and secret string.
+# For production, load this from environment variables or a secrets management tool.
+JWT_SECRET_KEY = os.getenv("AP_JWT_SECRET", "")
+JWT_ALGORITHM = "HS256"
