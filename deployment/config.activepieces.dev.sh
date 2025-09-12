@@ -16,9 +16,9 @@ UNIQUE_ID=$(head -c 4 /dev/urandom | xxd -p)
 APP_NAME_ACTIVEPIECES="salesopt-activepieces-app"
 
 # Names for your new Postgres and Redis resources
-POSTGRES_SERVER_NAME="salesopt-pg-server-dev-${UNIQUE_ID}"
+POSTGRES_SERVER_NAME="salesopt-pg-server-dev-b7e59be4"
 POSTGRES_ADMIN_USER="salesoptadmin"
-REDIS_CACHE_NAME="salesopt-redis-cache-dev-${UNIQUE_ID}"
+REDIS_CACHE_NAME="salesopt-redis-cache-dev-b7e59be4"
 SALESOPTAI_APIS="https://gentle-grass-02d3f240f.1.azurestaticapps.net"
 # POSTGRES_SERVER_NAME="salesopt-pg-server-dev-3fae475d"
 # POSTGRES_ADMIN_USER="salesoptadmin"
@@ -26,4 +26,4 @@ SALESOPTAI_APIS="https://gentle-grass-02d3f240f.1.azurestaticapps.net"
 # SALESOPTAI_APIS="https://gentle-grass-02d3f240f.1.azurestaticapps.net"
 
 #make sure we don't deploy any new infrastructure.
-DEPLOY_NEW_INFRA='true'
+DEPLOY_NEW_INFRA='false'

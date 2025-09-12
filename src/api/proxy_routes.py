@@ -244,6 +244,76 @@ async def logout(request: Request):
     return resp
 
 
+@router.api_route("/v1/webhooks/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+async def v1_webhook_handler(request: Request, rest_of_path: str):
+    print("\n✅ --- HTTP Webhook Intercepted! --- ✅")
+    from urllib.parse import parse_qsl
+    token = None
+    # 1) Build outbound headers first (fixes NameError and hop-by-hop leakage)
+    headers = _filtered_outgoing_headers(dict(request.headers))
+    headers.setdefault("X-Forwarded-Proto", request.url.scheme)
+    headers.setdefault("X-Forwarded-Host", request.headers.get("host", ""))
+    headers.setdefault("X-Forwarded-For", request.client.host if request.client else "")
+    extra_qs = {}
+    if "?" in rest_of_path:
+        path_only, qs = rest_of_path.split("?", 1)
+        rest_of_path = path_only
+        if qs:
+            extra_qs = dict(parse_qsl(qs, keep_blank_values=True))
+    q_params = dict(request.query_params)  # Starlette's QueryParams -> dict
+    if extra_qs:
+        # merge: request.query_params has precedence; keep existing values
+        for k, v in extra_qs.items():
+            q_params.setdefault(k, v)
+
+    body = await request.body()
+    token_from_query = request.query_params.get("ap_token")
+
+    auth_header = request.headers.get("Authorization")
+
+    if token_from_query:
+        token = token_from_query
+
+    elif auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split("Bearer ")[1]
+        print("--- Found JWT in Authorization header. ---")
+    else:
+        token=None
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication token not found.")
+
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    if rest_of_path.endswith("?"):
+        rest_of_path = rest_of_path[:-1]
+    full_url = f"{config.AP_BASE.rstrip('/')}/v1/webhooks/{rest_of_path.lstrip("/")}"
+    # 4) Debug
+    try:
+        from urllib.parse import urlencode
+        print(f"[UPSTREAM REQ] {request.method} {full_url}" + (f"?{urlencode(q_params, doseq=True)}" if q_params else ""))
+    except Exception:
+        pass
+
+    # 5) Send upstream
+    try:
+        async with httpx.AsyncClient(timeout=config.TIMEOUT, follow_redirects=False) as client:
+            resp = await client.request(
+                method=request.method,
+                url=full_url,
+                headers=headers,
+                params=(q_params or None),          # <- None when empty to avoid "?"
+                content=body,
+                cookies=request.cookies,
+            )
+    except httpx.RequestError as e:
+        return Response(content=f"Proxy connection error on webhook: {e}", status_code=502)
+
+    # 6) Filter unsafe headers on the way back
+    excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+    out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
+    return Response(content=resp.content, status_code=resp.status_code, headers=out_headers)
+
 @router.websocket("/{rest:path}")
 async def websocket_proxy(websocket: WebSocket, rest: str):
     """
@@ -363,15 +433,14 @@ async def proxy_static_assets(request: Request, rest: str):
 
     headers = _filtered_outgoing_headers(dict(request.headers))
     full_url = f"{config.AP_BASE.rstrip('/')}/assets/{rest}"
-
+    token = headers.split("Bearer ")[1] if headers.split("Bearer ")[1]!="" else None
     try:
         # Use httpx.AsyncClient for async requests
         async with httpx.AsyncClient(timeout=config.TIMEOUT) as client:
             resp = await client.get(full_url, headers=headers)
 
         # The url_rewrite is still useful for rewriting any URLs inside JS/CSS files
-        content = url_rewrite(resp.content, resp.headers.get("Content-Type", ""), None)
-
+        content = url_rewrite(resp.content, resp.headers.get("Content-Type", ""), token)
         excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
         out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
 
