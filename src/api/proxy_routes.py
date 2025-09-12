@@ -279,8 +279,8 @@ async def v1_webhook_handler(request: Request, rest_of_path: str):
         print("--- Found JWT in Authorization header. ---")
     else:
         token=None
-    if not token:
-        raise HTTPException(status_code=401, detail="Authentication token not found.")
+    # if not token:
+    #     raise HTTPException(status_code=401, detail="Authentication token not found.")
 
     if token:
         headers["Authorization"] = f"Bearer {token}"
