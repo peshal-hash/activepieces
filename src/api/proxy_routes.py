@@ -244,7 +244,7 @@ async def logout(request: Request):
     return resp
 
 
-@router.api_route("/v1/webhooks/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+@router.api_route("/api/v1/webhooks/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def v1_webhook_handler(request: Request, rest_of_path: str):
     print("\n✅ --- HTTP Webhook Intercepted! --- ✅")
     from urllib.parse import parse_qsl
@@ -270,7 +270,9 @@ async def v1_webhook_handler(request: Request, rest_of_path: str):
     token_from_query = request.query_params.get("ap_token")
 
     auth_header = request.headers.get("Authorization")
-
+    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print(auth_header)
+    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
     if token_from_query:
         token = token_from_query
 
@@ -433,7 +435,11 @@ async def proxy_static_assets(request: Request, rest: str):
 
     headers = _filtered_outgoing_headers(dict(request.headers))
     full_url = f"{config.AP_BASE.rstrip('/')}/assets/{rest}"
-    token = headers.split("Bearer ")[1] if headers.split("Bearer ")[1]!="" else None
+    token=None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split("Bearer ")[1]
+        print("--- Found JWT in Authorization header. ---")
     try:
         # Use httpx.AsyncClient for async requests
         async with httpx.AsyncClient(timeout=config.TIMEOUT) as client:
