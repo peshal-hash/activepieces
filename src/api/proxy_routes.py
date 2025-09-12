@@ -287,7 +287,7 @@ async def v1_webhook_handler(request: Request, rest_of_path: str):
 
     if rest_of_path.endswith("?"):
         rest_of_path = rest_of_path[:-1]
-    full_url = f"{config.AP_BASE.rstrip('/')}/v1/webhooks/{rest_of_path.lstrip("/")}"
+    full_url = f"{config.AP_BASE.rstrip('/')}/v1/webhooks/{rest_of_path.lstrip('/')}"
     # 4) Debug
     try:
         from urllib.parse import urlencode
