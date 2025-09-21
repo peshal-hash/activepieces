@@ -38,14 +38,26 @@ def _resolve_auth_from(request: Request) -> Tuple[Optional[str], Optional[str], 
 
 
 
-PLAT_SEGMENT_RE = re.compile(r"(?:^|/)(?:api/)?v1/platforms/([^/?#]+)", re.IGNORECASE)
+PLAT_SEGMENT_RE = re.compile(
+    r"(?:^|/)v1/platforms/([^/?#]+)",
+    re.IGNORECASE,
+)
+
+# Match .../projects/{pid}/flows/{fid}
 PROJECT_FLOW_PATH_RE = re.compile(
     r"(?P<prefix>(?:^|/)projects/)(?P<pid>[^/?#]+)/flows/(?P<fid>[^/?#]+)",
     re.IGNORECASE,
 )
-PROJECT_SEGMENT_RE = re.compile(r"(?P<prefix>(?:^|/)projects/)(?P<pid>[^/?#]+)", re.IGNORECASE)
+
+# Match .../projects/{pid}
+PROJECT_SEGMENT_RE = re.compile(
+    r"(?P<prefix>(?:^|/)projects/)(?P<pid>[^/?#]+)",
+    re.IGNORECASE,
+)
+
+# Match .../v1/users/projects/{pid}
 USERS_PROJECT_RE = re.compile(
-    r"(?P<prefix>(?:^|/)(?:api/)?v1/users/projects/)(?P<pid>[^/?#]+)",
+    r"(?P<prefix>(?:^|/)v1/users/projects/)(?P<pid>[^/?#]+)",
     re.IGNORECASE,
 )
 
@@ -296,6 +308,16 @@ async def v1_webhook_handler(request: Request, rest_of_path: str):
         print(f"[UPSTREAM REQ] {request.method} {full_url}" + (f"?{urlencode(q_params, doseq=True)}" if q_params else ""))
     except Exception:
         pass
+    print("****************************************************************************")
+    print("these are the api and call made to webhook")
+    print(f"{request.url.path}")
+    print(f"{rest_of_path}")
+    print("this is full url")
+    print(f"{full_url}")
+    print("this is parameters")
+    print(f"{q_params}")
+
+    print("*****************************************************************************")
 
     # 5) Send upstream
     try:
@@ -437,6 +459,15 @@ async def proxy_static_assets(request: Request, rest: str):
     full_url = f"{config.AP_BASE.rstrip('/')}/assets/{rest}"
     token=None
     auth_header = request.headers.get("Authorization")
+    print("****************************************************************************")
+    print("these are the api and call made to assests")
+    print(f"{request.url.path}")
+    print(f"{rest}")
+    print("this is full url")
+    print(f"{full_url}")
+
+    print("*****************************************************************************")
+
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split("Bearer ")[1]
         print("--- Found JWT in Authorization header. ---")
@@ -505,8 +536,18 @@ async def ap_proxy(request: Request, rest: str = ""):
         print("--- Found JWT in Authorization header. ---")
     else:
         token=None
-    if not token:
-        raise HTTPException(status_code=401, detail="Authentication token not found.")
+
+    # ========================================================================
+    # == MODIFICATION START ==
+    # The following block was removed. Previously, it raised a 401 HTTPException
+    # if no token was found, blocking all unauthenticated requests.
+    # By removing it, requests without a token are now allowed to pass through
+    # to the upstream service, which is responsible for handling them.
+    #
+    # ORIGINAL CODE:
+    # if not token:
+    #     raise HTTPException(status_code=401, detail="Authentication token not found.")
+    # ========================================================================
 
     if token:
         # Use .get() to handle cases where they might be missing or empty
@@ -527,18 +568,16 @@ async def ap_proxy(request: Request, rest: str = ""):
             print(payload)
             print("********************************************************")
 
-            if not token:
-                raise HTTPException(status_code=401, detail="Invalid token payload.")
+            # This check seems misplaced, as `token` is already confirmed to exist.
+            # Assuming it was intended to validate the payload contents.
+            # if not token:
+            #     raise HTTPException(status_code=401, detail="Invalid token payload.")
+            print("JWT decoded successfully. Using credentials from token.")
+
         except JWTError as e:
             # This handles expired tokens, invalid signatures, etc.
             print(f"JWT decoding failed: {e}")
             raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
-
-
-            print("JWT decoded successfully. Using credentials from token.")
-    else:
-        print(f"JWT decoding failed: {e}")
-        raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
 
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -609,6 +648,16 @@ async def ap_proxy(request: Request, rest: str = ""):
         q_params.pop("folderId", None)
 
     full_url = f"{config.AP_BASE.rstrip('/')}/{rest.lstrip('/')}"
+    print("****************************************************************************")
+    print("these are the api and call made to general call")
+    print(f"{request.url.path}")
+    print(f"{rest}")
+    print("this is full url")
+    print(f"{full_url}")
+    print("these are the parameters")
+    print(q_params)
+
+    print("*****************************************************************************")
 
     # Log without trailing '?' when there is no query
     qs = urlencode(q_params, doseq=True) if q_params else ""
