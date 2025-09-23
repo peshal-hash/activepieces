@@ -22,7 +22,7 @@ def sign_up(email: str, password: str, first_name: str, last_name: str) -> dict:
         requests.exceptions.HTTPError: If the API returns an error status code.
     """
 
-    url = f"{config.AP_BASE}/api/v1/authentication/sign-up"
+    url = f"{config.AP_BASE_URL}/api/v1/authentication/sign-up"
     payload = {
         "email": email,
         "password": password,
@@ -50,7 +50,7 @@ def sign_in(email: str, password: str) -> dict:
     Raises:
         requests.exceptions.HTTPError: If the API returns an error status code.
     """
-    url = f"{config.AP_BASE}/api/v1/authentication/sign-in"
+    url = f"{config.AP_BASE_URL}/api/v1/authentication/sign-in"
     payload = {"email": email, "password": password}
     response = requests.post(url, json=payload, timeout=config.TIMEOUT)
     response.raise_for_status()
