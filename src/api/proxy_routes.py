@@ -21,21 +21,6 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 router = APIRouter()
 
-# =========================================================
-# Shared token management (global fallback; prefer cookie)
-# =========================================================
-
-def _resolve_auth_from(request: Request) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    """
-    Prefer request cookies; if not present, fall back to module-level globals.
-    Reading globals is guarded by a lock to avoid torn reads while /workflow is writing.
-    """
-    cookie_token = request.cookies.get("ap_token")
-    cookie_pid = request.cookies.get("ap_project_id")
-    cookie_plat = request.cookies.get("ap_platform_id")
-
-    return cookie_token, cookie_pid, cookie_plat
-
 
 
 PLAT_SEGMENT_RE = re.compile(
@@ -91,7 +76,7 @@ def url_rewrite(content, content_type: str, token_to_inject: Optional[str]):
     Rewrites upstream origin references to the proxy origin and injects an auth token
     into HTML documents for the client-side application.
     """
-    upstream_origin = config.AP_BASE  # e.g., https://upstream.example.com
+    upstream_origin = config.AP_BASE_URL  # e.g., https://upstream.example.com
     proxy_origin = config.AP_PROXY_URL      # e.g., https://proxy.example.com
 
     content_str = None
@@ -166,7 +151,7 @@ async def workflow(payload: WorkflowPayload,request: Request):
         raise HTTPException(status_code=500, detail="Failed to get token after auth flow")
     # expire = datetime.utcnow() + timedelta(minutes=5)
     # data_to_encode = {
-    #     "ap_token": token,
+    #     "token": token,
     #     "ap_project_id": projectId,
     #     "ap_platform_id": platformId,
     #     "exp": expire,
@@ -174,7 +159,7 @@ async def workflow(payload: WorkflowPayload,request: Request):
     # encoded_jwt = jwt.encode(data_to_encode, config.JWT_SECRET_KEY, algorithm=config.JWT_ALGORITHM)
 
     # Append the JWT as a query parameter to the redirect URL
-    redirect_params = {"ap_token": token}
+    redirect_params = {"token": token}
     redirect_url_with_token = f"{config.AP_PROXY_URL.rstrip('/')}?{urlencode(redirect_params)}"
     resp = JSONResponse(content={"success": True, "redirectUrl": redirect_url_with_token})
     return resp
@@ -246,7 +231,7 @@ async def logout(request: Request):
         path="/",
         max_age=0,
     )
-    for name in ("ap_token", "ap_project_id", "ap_platform_id", "ap_session_born"):
+    for name in ("token", "ap_project_id", "ap_platform_id", "ap_session_born"):
         resp.set_cookie(name, value="", **cookie_args)
 
     # Optional: help proxies/CDNs avoid cross-user cache bleed
@@ -255,81 +240,36 @@ async def logout(request: Request):
     print("=== LOGOUT: cleared proxy token, set Clear-Site-Data, expired cookies ===")
     return resp
 
-
 @router.api_route("/api/v1/webhooks/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def v1_webhook_handler(request: Request, rest_of_path: str):
     print("\n✅ --- HTTP Webhook Intercepted! --- ✅")
-    from urllib.parse import parse_qsl
-    token = None
-    # 1) Build outbound headers first (fixes NameError and hop-by-hop leakage)
-    headers = _filtered_outgoing_headers(dict(request.headers))
-    headers.setdefault("X-Forwarded-Proto", request.url.scheme)
-    headers.setdefault("X-Forwarded-Host", request.headers.get("host", ""))
-    headers.setdefault("X-Forwarded-For", request.client.host if request.client else "")
-    extra_qs = {}
+    from urllib.parse import parse_qsl, urlencode
+    extra_qs=None
+    headers = request.headers
+    body = await request.body()
     if "?" in rest_of_path:
         path_only, qs = rest_of_path.split("?", 1)
         rest_of_path = path_only
         if qs:
             extra_qs = dict(parse_qsl(qs, keep_blank_values=True))
+
     q_params = dict(request.query_params)  # Starlette's QueryParams -> dict
     if extra_qs:
-        # merge: request.query_params has precedence; keep existing values
         for k, v in extra_qs.items():
             q_params.setdefault(k, v)
 
-    body = await request.body()
-    token_from_query = request.query_params.get("ap_token")
-
-    auth_header = request.headers.get("Authorization")
-    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-    print(auth_header)
-    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-    if token_from_query:
-        token = token_from_query
-
-    elif auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split("Bearer ")[1]
-        print("--- Found JWT in Authorization header. ---")
-    else:
-        token=None
-    # if not token:
-    #     raise HTTPException(status_code=401, detail="Authentication token not found.")
-
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-
-    if rest_of_path.endswith("?"):
-        rest_of_path = rest_of_path[:-1]
-    full_url = f"{config.AP_BASE.rstrip('/')}/v1/webhooks/{rest_of_path.lstrip('/')}"
-    # 4) Debug
+    full_url = f"{config.AP_BASE_URL.rstrip('/')}/api/v1/webhooks/{rest_of_path}"
     try:
-        from urllib.parse import urlencode
-        print(f"[UPSTREAM REQ] {request.method} {full_url}" + (f"?{urlencode(q_params, doseq=True)}" if q_params else ""))
-    except Exception:
-        pass
-    print("****************************************************************************")
-    print("these are the api and call made to webhook")
-    print(f"{request.url.path}")
-    print(f"{rest_of_path}")
-    print("this is full url")
-    print(f"{full_url}")
-    print("this is parameters")
-    print(f"{q_params}")
-
-    print("*****************************************************************************")
-
-    # 5) Send upstream
-    try:
-        async with httpx.AsyncClient(timeout=config.TIMEOUT, follow_redirects=False) as client:
+        async with httpx.AsyncClient(timeout=1200) as client:
             resp = await client.request(
                 method=request.method,
                 url=full_url,
                 headers=headers,
                 params=(q_params or None),          # <- None when empty to avoid "?"
                 content=body,
-                cookies=request.cookies,
             )
+            print(f"response {resp}")
+            print(f"{resp.content}")
     except httpx.RequestError as e:
         return Response(content=f"Proxy connection error on webhook: {e}", status_code=502)
 
@@ -347,7 +287,7 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
     await websocket.accept()
 
     # Build upstream WS URL from AP_BASE + incoming {rest} + original querystring
-    base = config.AP_BASE.rstrip("/")
+    base = config.AP_BASE_URL.rstrip("/")
     parsed = urlsplit(base)
     scheme = "wss" if parsed.scheme == "https" else "ws"
     incoming_qs = ""
@@ -456,18 +396,9 @@ async def proxy_static_assets(request: Request, rest: str):
     print(f"--- Asset proxy hit for: /assets/{rest} ---")
 
     headers = _filtered_outgoing_headers(dict(request.headers))
-    full_url = f"{config.AP_BASE.rstrip('/')}/assets/{rest}"
+    full_url = f"{config.AP_BASE_URL.rstrip('/')}/assets/{rest}"
     token=None
     auth_header = request.headers.get("Authorization")
-    print("****************************************************************************")
-    print("these are the api and call made to assests")
-    print(f"{request.url.path}")
-    print(f"{rest}")
-    print("this is full url")
-    print(f"{full_url}")
-
-    print("*****************************************************************************")
-
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split("Bearer ")[1]
         print("--- Found JWT in Authorization header. ---")
@@ -524,7 +455,7 @@ async def ap_proxy(request: Request, rest: str = ""):
             q_params.setdefault(k, v)
 
     # --- NEW: Check for JWT in query parameters first ---
-    token_from_query = request.query_params.get("ap_token")
+    token_from_query = request.query_params.get("token")
 
     auth_header = request.headers.get("Authorization")
 
@@ -647,7 +578,7 @@ async def ap_proxy(request: Request, rest: str = ""):
     if q_params.get("folderId") == "NULL":
         q_params.pop("folderId", None)
 
-    full_url = f"{config.AP_BASE.rstrip('/')}/{rest.lstrip('/')}"
+    full_url = f"{config.AP_BASE_URL.rstrip('/')}/{rest.lstrip('/')}"
     print("****************************************************************************")
     print("these are the api and call made to general call")
     print(f"{request.url.path}")
