@@ -122,7 +122,7 @@ export const CustomTooltipLink = ({
               <span className="text-sm">{label}</span>
             </div>
             <div className="grow"></div>
-            {tutorialTab && (
+            {/* {tutorialTab && (
               <TutorialsDialog
                 location="small-button-inside-sidebar-item"
                 initialTab={tutorialTab}
@@ -136,7 +136,7 @@ export const CustomTooltipLink = ({
                 </Button>
               </TutorialsDialog>
             )}
-            {label === 'Agents' && <BetaBadge showTooltip={false} />}
+            {label === 'Agents' && <BetaBadge showTooltip={false} />} */}
           </div>
           {locked && (
             <LockKeyhole className="size-4 stroke-[2px]" color="grey" />
@@ -229,7 +229,7 @@ export function SidebarComponent({
         {!hideSideNav && (
           <Sidebar className="h-screen">
             <SidebarContent className="h-full flex flex-col">
-              <ApDashboardSidebarHeader isHomeDashboard={isHomeDashboard} />
+              {/* <ApDashboardSidebarHeader isHomeDashboard={isHomeDashboard} /> */}
               <div className="flex-1 overflow-hidden">
                 <ScrollArea className="h-full">
                   <div className="space-y-0">
@@ -252,7 +252,7 @@ export function SidebarComponent({
                       <SidebarGroupContent>
                        <SidebarMenu>
                         {/* Setup AI link */}
-                        <SidebarMenuItem>
+                        {/* <SidebarMenuItem>
                           <SidebarMenuButton asChild>
                             <CustomTooltipLink
                               to={authenticationSession.appendProjectRoutePrefix("/setup/ai")}
@@ -261,7 +261,7 @@ export function SidebarComponent({
                               isSubItem={false}
                             />
                           </SidebarMenuButton>
-                        </SidebarMenuItem>
+                        </SidebarMenuItem> */}
 
 
                         <SidebarMenuItem>
