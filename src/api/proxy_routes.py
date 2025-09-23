@@ -119,49 +119,37 @@ def _is_https(request: Request) -> bool:
 
 @router.post("/workflow")
 async def workflow(payload: WorkflowPayload,request: Request):
-    # STEP 1: Add print statements to see if the endpoint is hit and what data is received.
-    print("--- ✅ /workflow endpoint was called! ---")
-    print(f"Received payload: {payload.model_dump_json()}")
-
-    try:
-        # This is the first attempt to sign in the user.
-        print("Attempting to sign in...")
-        ap_data = await asyncio.to_thread(activepieces_service.sign_in, payload.email, payload.password)
-        print("Sign in successful.")
-
-    # STEP 2: Broaden the exception catch. This now handles HTTP errors AND other network issues.
-    except requests.RequestException as e:
-        print(f"Sign in failed with error: {e}. Attempting to sign up instead...")
+    token=None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split("Bearer ")[1]
+    if token==None:
         try:
-            ap_data = await asyncio.to_thread(
-                activepieces_service.sign_up, payload.email, payload.password, payload.firstName, payload.lastName
-            )
-            print("Sign up successful.")
-        except requests.RequestException as signup_error:
-            # If sign-up also fails, raise a clear error.
-            print(f"Sign up also failed: {signup_error}")
-            raise HTTPException(status_code=401, detail=f"Activepieces auth failed on both sign-in and sign-up: {signup_error}")
+            # This is the first attempt to sign in the user.
+            print("Attempting to sign in...")
+            ap_data = await asyncio.to_thread(activepieces_service.sign_in, payload.email, payload.password)
+            print("Sign in successful.")
 
-    db_manager.store_user_data(ap_data)
-    print(ap_data)
-    token = ap_data.get("token")
-    projectId=ap_data.get("projectId")
-    platformId=ap_data.get("platformId")
+        # STEP 2: Broaden the exception catch. This now handles HTTP errors AND other network issues.
+        except requests.RequestException as e:
+            print(f"Sign in failed with error: {e}. Attempting to sign up instead...")
+            try:
+                ap_data = await asyncio.to_thread(
+                    activepieces_service.sign_up, payload.email, payload.password, payload.firstName, payload.lastName
+                )
+                print("Sign up successful.")
+            except requests.RequestException as signup_error:
+                # If sign-up also fails, raise a clear error.
+                print(f"Sign up also failed: {signup_error}")
+                raise HTTPException(status_code=401, detail=f"Activepieces auth failed on both sign-in and sign-up: {signup_error}")
+
+        db_manager.store_user_data(ap_data)
+        token = ap_data.get("token")
     if not token:
         raise HTTPException(status_code=500, detail="Failed to get token after auth flow")
-    # expire = datetime.utcnow() + timedelta(minutes=5)
-    # data_to_encode = {
-    #     "token": token,
-    #     "ap_project_id": projectId,
-    #     "ap_platform_id": platformId,
-    #     "exp": expire,
-    # }
-    # encoded_jwt = jwt.encode(data_to_encode, config.JWT_SECRET_KEY, algorithm=config.JWT_ALGORITHM)
-
-    # Append the JWT as a query parameter to the redirect URL
     redirect_params = {"token": token}
     redirect_url_with_token = f"{config.AP_PROXY_URL.rstrip('/')}?{urlencode(redirect_params)}"
-    resp = JSONResponse(content={"success": True, "redirectUrl": redirect_url_with_token})
+    resp = JSONResponse(content={"success": True, "redirectUrl": redirect_url_with_token,"token": token})
     return resp
 
 
@@ -313,7 +301,6 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
         ) as upstream_ws:
 
             async def pump_to_upstream():
-                # Browser -> Upstream
                 try:
                     while True:
                         try:
@@ -468,17 +455,6 @@ async def ap_proxy(request: Request, rest: str = ""):
     else:
         token=None
 
-    # ========================================================================
-    # == MODIFICATION START ==
-    # The following block was removed. Previously, it raised a 401 HTTPException
-    # if no token was found, blocking all unauthenticated requests.
-    # By removing it, requests without a token are now allowed to pass through
-    # to the upstream service, which is responsible for handling them.
-    #
-    # ORIGINAL CODE:
-    # if not token:
-    #     raise HTTPException(status_code=401, detail="Authentication token not found.")
-    # ========================================================================
 
     if token:
         # Use .get() to handle cases where they might be missing or empty
@@ -494,15 +470,9 @@ async def ap_proxy(request: Request, rest: str = ""):
 
             if platform_object and isinstance(platform_object, dict):
                 cookie_platform_id = platform_object.get("id")
-            # Extract the credentials from the token's payload
             print("********************************************************")
             print(payload)
             print("********************************************************")
-
-            # This check seems misplaced, as `token` is already confirmed to exist.
-            # Assuming it was intended to validate the payload contents.
-            # if not token:
-            #     raise HTTPException(status_code=401, detail="Invalid token payload.")
             print("JWT decoded successfully. Using credentials from token.")
 
         except JWTError as e:
@@ -518,13 +488,9 @@ async def ap_proxy(request: Request, rest: str = ""):
 
 
     # Upstream is AP_BASE + normalized rest
-    # Strip a naked trailing '?' if it somehow exists after manipulations (belt & suspenders)
     if rest.endswith("?"):
         rest = rest[:-1]
 
-    # --------------------------
-    # Platform ID normalization (path + header)
-    # --------------------------
     if cookie_platform_id:
         headers.setdefault("X-AP-Platform-Id", cookie_platform_id)
         m = PLAT_SEGMENT_RE.search(rest)
