@@ -26,7 +26,7 @@ export class ProjectAuthzHandler extends BaseSecurityHandler {
 
     protected canHandle(request: FastifyRequest): Promise<boolean> {
         const routerPath = request.routeOptions.url
-        assertNotNullOrUndefined(routerPath, 'routerPath is undefined'  )    
+        assertNotNullOrUndefined(routerPath, 'routerPath is undefined'  )
         const requestMatches = !ProjectAuthzHandler.IGNORED_ROUTES.includes(
             routerPath,
         )
