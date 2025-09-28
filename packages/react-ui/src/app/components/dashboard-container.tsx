@@ -137,7 +137,7 @@ export function DashboardContainer({ children }: DashboardContainerProps) {
     flowsLink,
     // agentsLink,
     tablesLink,
-    mcpLink
+    // mcpLink
     // todosLink,
     // releasesLink,
   ].filter(permissionFilter);
