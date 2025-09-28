@@ -1,88 +1,143 @@
-// Azure Container Apps deployment using Bicep for Production Environment
-param location string = resourceGroup().location
-param environmentName string = 'salesoptai-prod-environment'
-param keyVaultName string = 'salesoptai-prod-keyvault'
-param acrName string = 'salesoptaiprod'
-param appImageTag string = 'latest'
-param paymentImageTag string = 'latest'
-param customDomainEnabled bool = false // New parameter to control custom domain
-param certificateId string = '' // Optional certificate ID parameter
-param revisionSuffix string = '' // Add this line
+// Bicep template for deploying Activepieces with Postgres and Redis
 
-// Reference existing ACR
-resource acr 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' existing = {
+// --- PARAMETERS ---
+param location string
+param salesoptapis string
+param environmentName string = 'testAPContainerEnvironment'
+param logAnalyticsWorkspaceName string = 'ap-logs-${uniqueString(resourceGroup().id)}'
+param acrName string = 'salesopttest'
+param appImageTag string = 'latest'
+param revisionSuffix string = ''
+param containerAppName string
+param postgresServerName string
+param postgresAdminUser string
+param redisCacheName string
+param deployNewInfrastructure bool
+
+@secure()
+param postgresAdminPassword string
+
+@secure()
+param apiKey string
+
+@secure()
+param encryptionKey string
+
+@secure()
+param jwtSecret string
+
+// --- EXISTING RESOURCES ---
+resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
 }
-
-// Reference existing Key Vault
-resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
-  name: keyVaultName
+resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
+  name: 'salesopt-container-identity'
 }
 
-// Log Analytics Workspace for production monitoring
-resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
-  name: 'salesoptai-prod-logs'
+// --- INFRASTRUCTURE (CONDITIONAL CREATION) ---
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = if (deployNewInfrastructure) {
+  name: logAnalyticsWorkspaceName
   location: location
   properties: {
     sku: {
       name: 'PerGB2018'
     }
-    retentionInDays: 90 // 90 days retention for production
   }
 }
 
-// Create Container Apps Environment for production
-resource environment 'Microsoft.App/managedEnvironments@2023-05-01' = {
+resource existingLogAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
+  name: logAnalyticsWorkspaceName
+}
+
+resource environment 'Microsoft.App/managedEnvironments@2023-05-01' = if (deployNewInfrastructure) {
   name: environmentName
   location: location
   properties: {
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
-        customerId: logAnalyticsWorkspace.properties.customerId
-        sharedKey: logAnalyticsWorkspace.listKeys().primarySharedKey
+        customerId: existingLogAnalyticsWorkspace.properties.customerId
+        sharedKey: existingLogAnalyticsWorkspace.listKeys().primarySharedKey
       }
     }
   }
 }
 
-// User-assigned managed identity for Key Vault access
-resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: 'salesoptai-prod-identity'
+resource existingEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
+  name: environmentName
+}
+
+resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' = if (deployNewInfrastructure) {
+  name: postgresServerName
   location: location
-}
-
-// Role assignment for Key Vault Secrets User
-resource keyVaultSecretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, managedIdentity.id, 'Key Vault Secrets User')
-  scope: keyVault
+  sku: {
+    name: 'Standard_B1ms'
+    tier: 'Burstable'
+  }
   properties: {
-    roleDefinitionId: subscriptionResourceId(
-      'Microsoft.Authorization/roleDefinitions',
-      '4633458b-17de-408a-b874-0445c86b69e6'
-    )
-    principalId: managedIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
+    administratorLogin: postgresAdminUser
+    administratorLoginPassword: postgresAdminPassword
+    version: '14'
+    storage: {
+      storageSizeGB: 32
+    }
+    backup: {
+      backupRetentionDays: 7
+      geoRedundantBackup: 'Disabled'
+    }
   }
 }
 
-// Role assignment for ACR Pull
-resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, managedIdentity.id, 'ACR Pull')
-  scope: acr
+// --- THE CHANGE IS HERE ---
+// This resource adds a firewall rule to the PostgreSQL server.
+// The IP range 0.0.0.0 to 0.0.0.0 is a special rule that allows
+// all Azure services to connect to the database.
+resource postgresFirewallRule 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-03-01-preview' = if (deployNewInfrastructure) {
+  parent: postgresServer
+  name: 'AllowAllWindowsAzureIps'
   properties: {
-    roleDefinitionId: subscriptionResourceId(
-      'Microsoft.Authorization/roleDefinitions',
-      '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-    )
-    principalId: managedIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '0.0.0.0'
   }
 }
 
-// Payment Service (Internal) - Production Configuration
-resource paymentService 'Microsoft.App/containerApps@2023-05-01' = {
-  name: 'salesoptai-payment-prod'
+resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-03-01-preview' = if (deployNewInfrastructure) {
+  parent: postgresServer
+  name: 'activepieces'
+}
+
+resource redisCache 'Microsoft.Cache/redis@2023-08-01' = if (deployNewInfrastructure) {
+  name: redisCacheName
+  location: location
+  properties: {
+    sku: {
+      name: 'Basic'
+      family: 'C'
+      capacity: 0
+    }
+    enableNonSslPort: false
+    minimumTlsVersion: '1.2'
+  }
+}
+
+// Unconditional reference for connection string construction
+resource existingPostgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' existing = {
+  name: postgresServerName
+}
+resource existingRedisCache 'Microsoft.Cache/redis@2023-08-01' existing = {
+  name: redisCacheName
+}
+
+// --- CONNECTION STRINGS ---
+var postgresHost = existingPostgresServer.properties.fullyQualifiedDomainName
+var redisHost = existingRedisCache.properties.hostName
+var redisPort = '${existingRedisCache.properties.sslPort}'
+
+var fqdn = '${containerAppName}.${existingEnvironment.properties.defaultDomain}'
+
+// --- CONTAINER APP DEPLOYMENT ---
+resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
+  name: containerAppName
   location: location
   identity: {
     type: 'UserAssigned'
@@ -91,19 +146,20 @@ resource paymentService 'Microsoft.App/containerApps@2023-05-01' = {
     }
   }
   properties: {
-    managedEnvironmentId: environment.id
+    managedEnvironmentId: existingEnvironment.id
     configuration: {
-      activeRevisionsMode: 'Multiple' // Multiple for zero-downtime deployments
+      activeRevisionsMode: 'Single'
       ingress: {
-        external: false
-        targetPort: 8001
-        transport: 'http'
+        external: true
+        targetPort: 5000
+        transport: 'auto'
         corsPolicy: {
           allowedOrigins: [
+            'https://gentle-grass-02d3f240f.1.azurestaticapps.net'
             'https://portal.salesoptai.com'
             'http://localhost:3000'
           ]
-          allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+          allowedMethods: ['*']
           allowedHeaders: ['*']
           allowCredentials: true
         }
@@ -114,315 +170,130 @@ resource paymentService 'Microsoft.App/containerApps@2023-05-01' = {
           identity: managedIdentity.id
         }
       ]
-      secrets: [
-        {
-          name: 'helcim-api-token'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/HELCIM-API-TOKEN'
-          identity: managedIdentity.id
-        }
-      ]
     }
     template: {
       revisionSuffix: revisionSuffix
       containers: [
         {
-          image: '${acr.properties.loginServer}/salesoptai-payment-prod:${paymentImageTag}'
-          name: 'payment-service'
+          image: '${acr.properties.loginServer}/${containerAppName}:${appImageTag}'
+          name: 'ap-main-app'
           resources: {
-            cpu: json('1.0') // Higher resources for production
+            cpu: json('1.0')
             memory: '2.0Gi'
           }
           env: [
             {
-              name: 'ENVIRONMENT'
-              value: 'production'
+              name: 'AP_POSTGRES_DATABASE'
+              value: 'activepieces'
             }
             {
-              name: 'DEBUG'
-              value: 'false'
+              name: 'AP_POSTGRES_HOST'
+              value: postgresHost
             }
             {
-              name: 'HELCIM_API_URL'
-              value: 'https://api.helcim.com/v2'
+              name: 'AP_POSTGRES_PORT'
+              value: '5432'
             }
             {
-              name: 'HELCIM_MONTHLY_PLAN_ID'
-              value: '14570' // TODO: Verify production plan IDs
+              name: 'AP_POSTGRES_USERNAME'
+              value: postgresAdminUser
             }
             {
-              name: 'HELCIM_ANNUAL_PLAN_ID'
-              value: '14570' // TODO: Verify production plan IDs
+              name: 'AP_POSTGRES_PASSWORD'
+              value: postgresAdminPassword
             }
             {
-              name: 'HELCIM_API_TOKEN'
-              secretRef: 'helcim-api-token'
-            }
-          ]
-          probes: [
-            {
-              type: 'Liveness'
-              httpGet: {
-                path: '/'
-                port: 8001
-              }
-              initialDelaySeconds: 30
-              periodSeconds: 30
+              name: 'AP_POSTGRES_USE_SSL'
+              value: 'true'
             }
             {
-              type: 'Readiness'
-              httpGet: {
-                path: '/'
-                port: 8001
-              }
-              initialDelaySeconds: 10
-              periodSeconds: 10
+              name: 'AP_REDIS_USE_SSL'
+              value: 'true'
             }
-          ]
-        }
-      ]
-      scale: {
-        minReplicas: 2 // Minimum 2 for HA
-        maxReplicas: 10
-        rules: [
-          {
-            name: 'http-scaling'
-            http: {
-              metadata: {
-                concurrentRequests: '50'
-              }
-            }
-          }
-        ]
-      }
-    }
-  }
-  dependsOn: [
-    keyVaultSecretsUserRole
-    acrPullRole
-  ]
-}
 
-// Main Application (External) - Production Configuration
-resource mainApp 'Microsoft.App/containerApps@2023-05-01' = {
-  name: 'salesoptai-app-prod'
-  location: location
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${managedIdentity.id}': {}
-    }
-  }
-  properties: {
-    managedEnvironmentId: environment.id
-    configuration: {
-      activeRevisionsMode: 'Multiple' // Multiple for zero-downtime deployments
-      ingress: {
-        external: true
-        targetPort: 8000
-        transport: 'http'
-        corsPolicy: {
-          allowedOrigins: [
-            'https://salesoptai.com'
-            'https://www.salesoptai.com'
-            'https://app.salesoptai.com'
-            // Remove localhost for production
-          ]
-          allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-          allowedHeaders: ['*']
-          allowCredentials: true
-        }
-        // Only include custom domains if enabled and certificate ID is provided
-        customDomains: customDomainEnabled && !empty(certificateId)
-          ? [
-              {
-                name: 'api.salesoptai.com'
-                certificateId: certificateId
-              }
-            ]
-          : []
-      }
-      registries: [
-        {
-          server: acr.properties.loginServer
-          identity: managedIdentity.id
-        }
-      ]
-      secrets: [
-        {
-          name: 'database-url'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/DATABASE-URL'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'openai-api-key'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/OPENAI-API-KEY'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'vapi-api-key'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/VAPI-API-KEY'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'trieve-api-key'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/TRIEVE-API-KEY'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'smtp-username'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/SMTP-USERNAME'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'smtp-password'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/SMTP-PASSWORD'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'helcim-api-token'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/HELCIM-API-TOKEN'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'helcim-monthly-plan-id'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/HELCIM-MONTHLY-PLAN-ID'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'helcim-annual-plan-id'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/HELCIM-ANNUAL-PLAN-ID'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'twilio-account-sid'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/TWILIO-ACCOUNT-SID'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'twilio-auth-token'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/TWILIO-AUTH-TOKEN'
-          identity: managedIdentity.id
-        }
-        {
-          name: 'twilio-from-number'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/TWILIO-FROM-NUMBER'
-          identity: managedIdentity.id
-        }
-      ]
-    }
-    template: {
-      revisionSuffix: revisionSuffix
-      containers: [
-        {
-          image: '${acr.properties.loginServer}/salesoptai-app-prod:${appImageTag}'
-          name: 'main-app'
-          resources: {
-            cpu: json('2.0') // Higher resources for production
-            memory: '4.0Gi'
-          }
-          env: [
             {
-              name: 'ENVIRONMENT'
-              value: 'production'
+              name: 'AP_REDIS_HOST'
+              value: redisHost
             }
             {
-              name: 'DEBUG'
-              value: 'false'
+              name: 'AP_REDIS_PORT'
+              value: redisPort
+            }
+
+            {
+              name: 'AP_REDIS_PASSWORD'
+              value: existingRedisCache.listKeys().primaryKey
             }
             {
-              name: 'PYTHONUNBUFFERED'
-              value: '1'
+              name: 'AP_API_KEY'
+              value: apiKey
             }
             {
-              name: 'LOG_LEVEL'
-              value: 'INFO'
+              name: 'AP_ENCRYPTION_KEY'
+              value: encryptionKey
             }
             {
-              name: 'LOG_FORMATTER'
-              value: 'simple'
+              name: 'AP_JWT_SECRET'
+              value: jwtSecret
             }
             {
-              name: 'PAYMENT_SERVICE_URL'
-              value: 'http://salesoptai-payment-prod'
+              name: 'AP_ENVIRONMENT'
+              value: 'prod'
             }
             {
-              name: 'TRIEVE_ORGANIZATION_ID'
-              value: 'ddfcd624-7363-4c41-9bbb-cca81d3e9564'
+              name: 'AP_FRONTEND_URL'
+              value: 'https://${fqdn}'
             }
             {
-              name: 'DATABASE_URL'
-              secretRef: 'database-url'
+              name: 'AP_BASE_URL'
+              value: 'http://localhost:80'
             }
             {
-              name: 'OPENAI_API_KEY'
-              secretRef: 'openai-api-key'
+              name: 'AP_PROXY_URL'
+              value: 'https://${fqdn}'
             }
             {
-              name: 'TRIEVE_API_KEY'
-              secretRef: 'trieve-api-key'
+              name: 'AP_WEBHOOK_TIMEOUT_SECONDS'
+              value: '30'
             }
             {
-              name: 'VAPI_API_KEY'
-              secretRef: 'vapi-api-key'
+              name: 'AP_TRIGGER_DEFAULT_POLL_INTERVAL'
+              value: '5'
             }
             {
-              name: 'SMTP_USERNAME'
-              secretRef: 'smtp-username'
+              name: 'AP_EXECUTION_MODE'
+              value: 'UNSANDBOXED'
             }
             {
-              name: 'SMTP_PASSWORD'
-              secretRef: 'smtp-password'
+              name: 'AP_FLOW_TIMEOUT_SECONDS'
+              value: '1800'
             }
             {
-              name: 'HELCIM_API_TOKEN'
-              secretRef: 'helcim-api-token'
+              name: 'AP_TELEMETRY_ENABLED'
+              value: 'true'
             }
             {
-              name: 'HELCIM_MONTHLY_PLAN_ID'
-              secretRef: 'helcim-monthly-plan-id'
+              name: 'AP_TEMPLATES_SOURCE_URL'
+              value: ''
             }
             {
-              name: 'HELCIM_ANNUAL_PLAN_ID'
-              secretRef: 'helcim-annual-plan-id'
+              name: 'AP_PUBLIC_SIGNUP_PERSONAL'
+              value: 'true'
             }
             {
-              name: 'TWILIO_ACCOUNT_SID'
-              secretRef: 'twilio-account-sid'
+              name: 'AP_SALESOPTAI_URLS'
+              value: salesoptapis
             }
             {
-              name: 'TWILIO_AUTH_TOKEN'
-              secretRef: 'twilio-auth-token'
-            }
-            {
-              name: 'TWILIO_FROM_NUMBER'
-              secretRef: 'twilio-from-number'
-            }
-          ]
-          probes: [
-            {
-              type: 'Liveness'
-              httpGet: {
-                path: '/'
-                port: 8000
-              }
-              initialDelaySeconds: 30
-              periodSeconds: 30
-            }
-            {
-              type: 'Readiness'
-              httpGet: {
-                path: '/'
-                port: 8000
-              }
-              initialDelaySeconds: 10
-              periodSeconds: 10
+              name: 'AP_WEBSITE_NAME'
+              value: 'SalesOptAi'
             }
           ]
         }
       ]
       scale: {
-        minReplicas: 3 // Minimum 3 for HA
-        maxReplicas: 20
+        minReplicas: 1
+        maxReplicas: 2
         rules: [
           {
             name: 'http-scaling'
@@ -432,41 +303,11 @@ resource mainApp 'Microsoft.App/containerApps@2023-05-01' = {
               }
             }
           }
-          {
-            name: 'cpu-scaling'
-            custom: {
-              type: 'cpu'
-              metadata: {
-                type: 'Utilization'
-                value: '70'
-              }
-            }
-          }
         ]
       }
     }
   }
-  dependsOn: [
-    keyVaultSecretsUserRole
-    acrPullRole
-    paymentService
-  ]
 }
 
-// Application Insights for monitoring
-resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: 'salesoptai-prod-insights'
-  location: location
-  kind: 'web'
-  properties: {
-    Application_Type: 'web'
-    WorkspaceResourceId: logAnalyticsWorkspace.id
-  }
-}
-
-// Outputs
-output appUrl string = mainApp.properties.configuration.ingress.fqdn
-output paymentServiceUrl string = paymentService.properties.configuration.ingress.fqdn
-output acrLoginServer string = acr.properties.loginServer
-output appInsightsInstrumentationKey string = appInsights.properties.InstrumentationKey
-output appInsightsConnectionString string = appInsights.properties.ConnectionString
+// --- OUTPUTS ---
+output appUrl string = fqdn
