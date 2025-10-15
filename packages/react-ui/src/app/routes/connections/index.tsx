@@ -155,13 +155,13 @@ function AppConnectionsPage() {
       icon: Tag,
       options: [],
     } as const,
-    {
-      type: 'select',
-      title: t('Owner'),
-      accessorKey: 'owner',
-      icon: User,
-      options: ownersOptions ?? [],
-    } as const,
+    // {
+    //   type: 'select',
+    //   title: t('Owner'),
+    //   accessorKey: 'owner',
+    //   icon: User,
+    //   options: ownersOptions ?? [],
+    // } as const,
   ];
 
   const columns: ColumnDef<
@@ -321,32 +321,32 @@ function AppConnectionsPage() {
         );
       },
     },
-    {
-      accessorKey: 'owner',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t('Owner')} />
-      ),
-      cell: ({ row }) => {
-        return (
-          <div className="text-left">
-            {row.original.owner && (
-              <ApAvatar
-                type="user"
-                includeName={true}
-                size="small"
-                userEmail={row.original.owner.email}
-                fullName={
-                  row.original.owner.firstName +
-                  ' ' +
-                  row.original.owner.lastName
-                }
-              />
-            )}
-            {!row.original.owner && <div className="text-left">-</div>}
-          </div>
-        );
-      },
-    },
+    // {
+    //   accessorKey: 'owner',
+    //   header: ({ column }) => (
+    //     <DataTableColumnHeader column={column} title={t('Owner')} />
+    //   ),
+    //   cell: ({ row }) => {
+    //     return (
+    //       <div className="text-left">
+    //         {row.original.owner && (
+    //           <ApAvatar
+    //             type="user"
+    //             includeName={true}
+    //             size="small"
+    //             userEmail={row.original.owner.email}
+    //             fullName={
+    //               row.original.owner.firstName +
+    //               ' ' +
+    //               row.original.owner.lastName
+    //             }
+    //           />
+    //         )}
+    //         {!row.original.owner && <div className="text-left">-</div>}
+    //       </div>
+    //     );
+    //   },
+    // },
     {
       accessorKey: 'flowCount',
       header: ({ column }) => (
