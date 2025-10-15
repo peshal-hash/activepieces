@@ -45,11 +45,11 @@ const tabs = [
     name: t('Explore'),
     icon: <LayoutGridIcon className="size-5 " />,
   },
-  {
-    value: PieceSelectorTabType.AI_AND_AGENTS,
-    name: t('AI & Agents'),
-    icon: <SparklesIcon className="size-5" />,
-  },
+  // {
+  //   value: PieceSelectorTabType.AI_AND_AGENTS,
+  //   name: t('AI & Agents'),
+  //   icon: <SparklesIcon className="size-5" />,
+  // },
   {
     value: PieceSelectorTabType.APPS,
     name: t('Apps'),

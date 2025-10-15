@@ -55,56 +55,74 @@ export const stepsHooks = {
       }),
     });
   },
-  useAllStepsMetadata: ({ searchQuery, type, enabled }: UseMetadataProps) => {
-    const { i18n } = useTranslation();
-    const query = useQuery<StepMetadataWithSuggestions[], Error>({
-      queryKey: ['pieces-metadata', searchQuery, type],
-      queryFn: async () => {
-        const pieces = await piecesApi.list({
-          searchQuery,
-          suggestionType:
-            type === 'action' ? SuggestionType.ACTION : SuggestionType.TRIGGER,
-          locale: i18n.language as LocalesEnum,
-        });
+useAllStepsMetadata: ({ searchQuery, type, enabled }: UseMetadataProps) => {
+  const { i18n } = useTranslation();
 
-        const filteredPiecesBySuggestionType = pieces.filter(
-          (piece) =>
-            (type === 'action' && piece.actions > 0) ||
-            (type === 'trigger' && piece.triggers > 0),
-        );
+  // --- helper to identify "Agent" piece(s)
+  const isAgentPiece = (piece: { name?: string; displayName?: string }) => {
+    const name = (piece.name ?? '').toLowerCase();
+    const display = (piece.displayName ?? '').toLowerCase();
+    // hard block the official agent piece by package name, plus any that say "agent"
+    return (
+      name === '@activepieces/piece-agent' ||
+      /\bagents?\b/.test(name) ||
+      /\bagents?\b/.test(display)
+    );
+  };
 
-        const piecesMetadata = filteredPiecesBySuggestionType.map((piece) => {
-          const metadata = stepUtils.mapPieceToMetadata({
-            piece,
-            type,
-          });
-          return {
-            ...metadata,
-            suggestedActions: piece.suggestedActions,
-            suggestedTriggers: piece.suggestedTriggers,
-          };
-        });
+  const query = useQuery<StepMetadataWithSuggestions[], Error>({
+    queryKey: ['pieces-metadata', searchQuery, type],
+    queryFn: async () => {
+      const pieces = await piecesApi.list({
+        searchQuery,
+        suggestionType:
+          type === 'action' ? SuggestionType.ACTION : SuggestionType.TRIGGER,
+        locale: i18n.language as LocalesEnum,
+      });
 
-        switch (type) {
-          case 'action': {
-            const filteredCoreActions = CORE_ACTIONS_METADATA.filter((step) =>
-              passSearch(searchQuery, step),
-            );
-            return [...filteredCoreActions, ...piecesMetadata];
-          }
-          case 'trigger':
-            return [...piecesMetadata];
+      // keep only items that have suggestions for the requested mode…
+      const filteredBySuggestionType = pieces.filter(
+        (piece) =>
+          (type === 'action' && piece.actions > 0) ||
+          (type === 'trigger' && piece.triggers > 0),
+      );
+
+      // …and drop Agent items entirely
+      const withoutAgent = filteredBySuggestionType.filter(
+        (p) => !isAgentPiece(p),
+      );
+
+      const piecesMetadata = withoutAgent.map((piece) => {
+        const metadata = stepUtils.mapPieceToMetadata({ piece, type });
+        return {
+          ...metadata,
+          suggestedActions: piece.suggestedActions,
+          suggestedTriggers: piece.suggestedTriggers,
+        };
+      });
+
+      switch (type) {
+        case 'action': {
+          const filteredCoreActions = CORE_ACTIONS_METADATA.filter((step) =>
+            passSearch(searchQuery, step),
+          );
+          return [...filteredCoreActions, ...piecesMetadata];
         }
-      },
-      enabled,
-      staleTime: searchQuery ? 0 : Infinity,
-    });
-    return {
-      refetch: query.refetch,
-      metadata: query.data,
-      isLoading: query.isLoading,
-    };
-  },
+        case 'trigger':
+          return [...piecesMetadata];
+      }
+    },
+    enabled,
+    staleTime: searchQuery ? 0 : Infinity,
+  });
+
+  return {
+    refetch: query.refetch,
+    metadata: query.data,
+    isLoading: query.isLoading,
+  };
+},
+
 };
 function passSearch(
   searchQuery: string | undefined,
