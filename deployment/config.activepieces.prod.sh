@@ -13,11 +13,13 @@ API_KEY="f379cfbee75176ebfe6f39b4b7dedf123b8cd54b8b5343180ee650625d5100532c5a9a9
 UNIQUE_ID=$(head -c 4 /dev/urandom | xxd -p)
 
 # App-specific name for the Activepieces container
-APP_NAME_ACTIVEPIECES="salesopt-activepieces-app"
+APP_NAME_ACTIVEPIECES="agentops"
 
 # Names for your new Postgres and Redis resources
 POSTGRES_SERVER_NAME="salesopt-pg-server-dev-b7e59be4"
 POSTGRES_ADMIN_USER="salesoptadmin"
 REDIS_CACHE_NAME="salesopt-redis-cache-dev-b7e59be4"
-SALESOPTAI_APIS="https://gentle-grass-02d3f240f.1.azurestaticapps.net"
+SALESOPTAI_APIS="https://portal.salesoptai.com , https://salesoptai-app-prod.icystone-9246cdc7.canadaeast.azurecontainerapps.io"
+
+#make sure we don't deploy any new infrastructure.
 DEPLOY_NEW_INFRA='false'

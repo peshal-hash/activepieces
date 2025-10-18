@@ -106,7 +106,7 @@ resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2
   name: 'activepieces'
 }
 
-resource redisCache 'Microsoft.Cache/redis@2023-08-01' = if (deployNewInfrastructure) {
+resource redisCache 'Microsoft.Cache/redis@2023-08-01' = {
   name: redisCacheName
   location: location
   properties: {
@@ -119,7 +119,6 @@ resource redisCache 'Microsoft.Cache/redis@2023-08-01' = if (deployNewInfrastruc
     minimumTlsVersion: '1.2'
   }
 }
-
 // Unconditional reference for connection string construction
 resource existingPostgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' existing = {
   name: postgresServerName
@@ -178,8 +177,8 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           image: '${acr.properties.loginServer}/${containerAppName}:${appImageTag}'
           name: 'ap-main-app'
           resources: {
-            cpu: json('1.0')
-            memory: '2.0Gi'
+            cpu: json('2.0')
+            memory: '4.0Gi'
           }
           env: [
             {
