@@ -31,12 +31,12 @@ const ChangePasswordForm = () => {
   const [isPasswordFocused, setPasswordFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const form = useForm<{
-    otp: string;
+    oldPassword: string;
     identityId: string;
     newPassword: string;
   }>({
     defaultValues: {
-      otp: queryParams.get('otpcode') || '',
+      oldPassword: queryParams.get('otpcode') || '',
       identityId: queryParams.get('identityId') || '',
       newPassword: '',
     },

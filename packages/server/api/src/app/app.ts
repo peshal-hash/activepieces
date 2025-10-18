@@ -338,6 +338,12 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
             await app.register(projectModule)
             await app.register(communityPiecesModule)
             await app.register(communityFlowTemplateModule)
+            await app.register(otpModule)
+            await app.register(enterpriseLocalAuthnModule)
+            await app.register(federatedAuthModule)
+
+            systemJobHandlers.registerJobHandler(SystemJobName.ISSUES_REMINDER, emailService(app.log).sendReminderJobHandler)
+            setPlatformOAuthService(platformOAuth2Service(app.log))
             break
     }
 

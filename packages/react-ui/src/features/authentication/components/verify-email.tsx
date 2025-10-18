@@ -25,7 +25,7 @@ const VerifyEmail = () => {
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
       return await authenticationApi.verifyEmail({
-        otp: otp!,
+
         identityId: identityId!,
       });
     },

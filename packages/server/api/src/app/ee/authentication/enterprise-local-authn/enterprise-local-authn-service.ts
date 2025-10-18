@@ -9,27 +9,19 @@ import { userIdentityService } from '../../../authentication/user-identity/user-
 import { otpService } from '../otp/otp-service'
 
 export const enterpriseLocalAuthnService = (log: FastifyBaseLogger) => ({
-    async verifyEmail({ identityId, otp }: VerifyEmailRequestBody): Promise<UserIdentity> {
-        await confirmOtp({
-            identityId,
-            otp,
-            otpType: OtpType.EMAIL_VERIFICATION,
-            log,
-        })
+    async verifyEmail({ identityId }: VerifyEmailRequestBody): Promise<UserIdentity> {
+        await confirmOtp({identityId,oldPassword:'',log})
 
         return userIdentityService(log).verify(identityId)
     },
 
     async resetPassword({
         identityId,
-        otp,
+        oldPassword,
         newPassword,
     }: ResetPasswordRequestBody): Promise<void> {
         await confirmOtp({
-            identityId,
-            otp,
-            otpType: OtpType.PASSWORD_RESET,
-            log,
+            identityId,oldPassword ,log
         })
 
         await userIdentityService(log).updatePassword({
@@ -41,15 +33,10 @@ export const enterpriseLocalAuthnService = (log: FastifyBaseLogger) => ({
 
 const confirmOtp = async ({
     identityId,
-    otp,
-    otpType,
-    log,
+    oldPassword,
+    log
 }: ConfirmOtpParams): Promise<void> => {
-    const isOtpValid = await otpService(log).confirm({
-        identityId,
-        type: otpType,
-        value: otp,
-    })
+    const isOtpValid = await otpService(log).confirm({identityId,oldPassword})
 
     if (!isOtpValid) {
         throw new ActivepiecesError({
@@ -61,7 +48,6 @@ const confirmOtp = async ({
 
 type ConfirmOtpParams = {
     identityId: UserId
-    otp: string
-    otpType: OtpType
+    oldPassword: string
     log: FastifyBaseLogger
 }

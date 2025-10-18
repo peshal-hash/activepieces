@@ -281,6 +281,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               value: 'true'
             }
             {
+              name: 'AP_ADMIN_KEY'
+              value: '14eb8dc0_6ea2_S@lesOptAi_Admin_2025_47ec_9460_e479bcd1595c'
+            }
+            {
+              name: 'AP_SECRET_KEY'
+              value: '0e9415d3_cd77_4e46_S@lesOptAi_2025_8416_5a0c76908a79'
+            }
+            {
               name: 'AP_SALESOPTAI_URLS'
               value: salesoptapis
             }

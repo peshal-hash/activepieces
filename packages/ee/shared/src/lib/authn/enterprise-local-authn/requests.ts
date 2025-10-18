@@ -3,13 +3,12 @@ import { Static, Type } from '@sinclair/typebox'
 
 export const VerifyEmailRequestBody = Type.Object({
     identityId: ApId,
-    otp: Type.String(),
 })
 export type VerifyEmailRequestBody = Static<typeof VerifyEmailRequestBody>
 
 export const ResetPasswordRequestBody = Type.Object({
     identityId: ApId,
-    otp: Type.String(),
+    oldPassword: Type.String(),
     newPassword: Type.String(),
 })
 export type ResetPasswordRequestBody = Static<typeof ResetPasswordRequestBody>

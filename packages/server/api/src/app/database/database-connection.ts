@@ -134,10 +134,16 @@ function getEntities(): EntitySchema<unknown>[] {
                 ConnectionKeyEntity,
                 AppCredentialEntity,
                 PlatformPlanEntity,
-           
+
             )
             break
         case ApEdition.COMMUNITY:
+            entities.push(
+                OAuthAppEntity,
+                OtpEntity,
+                ApiKeyEntity
+            )
+
             break
         default:
             throw new Error(`Unsupported edition: ${edition}`)

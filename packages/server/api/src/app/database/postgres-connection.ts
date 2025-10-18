@@ -244,6 +244,7 @@ import { RemoveTerminationReason1751728035816 } from './migration/postgres/17517
 import { AddLockedColumnToProjectPlan1751878623268 } from './migration/postgres/1751878623268-AddLockedColumnToProjectPlan'
 import { AddFlowVersionToIssue1751927222122 } from './migration/postgres/1751927222122-AddFlowVersionToIssue'
 import { AddMcpsEnabled1751989232042 } from './migration/postgres/1751989232042-AddMcpsEnabled'
+import {CreateOtpTable1760724044072} from "./migration/postgres/1760724044072-CreateOtpTable"
 import { AddIndexForSchemaVersionInFlowVersion1752151941009 } from './migration/postgres/1752151941009-AddIndexForSchemaVersionInFlowVersion'
 import { AddCreatedToFlowVersionFlowIdIdxPostgres1752511716028 } from './migration/postgres/1752511716028-AddCreatedToFlowVersionFlowIdIdxPostgres'
 import { AddAgentRunsEntityPostgres1752583341290 } from './migration/postgres/1752583341290-AddAgentRunsEntityPostgres'
@@ -449,6 +450,7 @@ const getMigrations = (): (new () => MigrationInterface)[] => {
         AddJobIdToTriggerRun1754510611628,
         RemoveAgentTestPrompt1754863565929,
         RemoveAgentRelationToTables1755954192258,
+
     ]
 
     const edition = system.getEdition()
@@ -548,12 +550,15 @@ const getMigrations = (): (new () => MigrationInterface)[] => {
                 AddPlatformAnalyticsReportEntity1753091760355,
                 AddBillingCycle1754559781173,
                 EligibileForTrial1754852385518,
+
             )
             break
         case ApEdition.COMMUNITY:
             commonMigration.push(
                 AddPlatformToPostgres1709052740378,
                 SetNotNullOnPlatform1709505632771,
+                CreateOtpTable1760724044072,
+
             )
             break
     }

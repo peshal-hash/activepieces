@@ -34,7 +34,7 @@ export const EmailType = Type.String({
 })
 
 export const PasswordType = Type.String({
-    minLength: 8,
+    minLength: 3,
     maxLength: 64,
 })
 
