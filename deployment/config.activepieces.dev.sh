@@ -13,8 +13,7 @@ API_KEY="f379cfbee75176ebfe6f39b4b7dedf123b8cd54b8b5343180ee650625d5100532c5a9a9
 UNIQUE_ID=$(head -c 4 /dev/urandom | xxd -p)
 
 # App-specific name for the Activepieces container
-APP_NAME_ACTIVEPIECES="agentops"
-
+APP_NAME_ACTIVEPIECES="salesopt-activepieces-app"
 # Names for your new Postgres and Redis resources
 POSTGRES_SERVER_NAME="salesopt-pg-server-dev-b7e59be4"
 POSTGRES_ADMIN_USER="salesoptadmin"
