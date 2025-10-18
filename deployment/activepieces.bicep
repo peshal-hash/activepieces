@@ -106,7 +106,7 @@ resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2
   name: 'activepieces'
 }
 
-resource redisCache 'Microsoft.Cache/redis@2023-08-01' = {
+resource redisCache 'Microsoft.Cache/redis@2023-08-01' = if (deployNewInfrastructure) {
   name: redisCacheName
   location: location
   properties: {
