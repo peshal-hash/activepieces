@@ -103,3 +103,6 @@ assistants_v2/test_assistant_builder.py
 uploads/
 *.db
 *.sqlite3
+
+
+src/migration.py

@@ -125,38 +125,38 @@ export function PlatformAdminContainer({
     //     },
     //   ],
     // },
-    {
-      type: 'group',
-      label: t('Infrastructure'),
-      icon: Server,
-      defaultOpen: false,
-      open: infrastructureOpen,
-      setOpen: setInfrastructureOpen,
-      isActive: (pathname: string) => pathname.includes('/infrastructure'),
-      items: [
-        {
-          type: 'link',
-          to: '/platform/infrastructure/workers',
-          label: t('Workers'),
-          isSubItem: true,
-          show: true,
-        },
-        {
-          type: 'link',
-          to: '/platform/infrastructure/health',
-          label: t('Health'),
-          isSubItem: true,
-          show: true,
-        },
-        {
-          type: 'link',
-          to: '/platform/infrastructure/triggers',
-          label: t('Triggers'),
-          isSubItem: true,
-          show: true,
-        },
-      ],
-    },
+    // {
+    //   type: 'group',
+    //   label: t('Infrastructure'),
+    //   icon: Server,
+    //   defaultOpen: false,
+    //   open: infrastructureOpen,
+    //   setOpen: setInfrastructureOpen,
+    //   isActive: (pathname: string) => pathname.includes('/infrastructure'),
+    //   items: [
+    //     {
+    //       type: 'link',
+    //       to: '/platform/infrastructure/workers',
+    //       label: t('Workers'),
+    //       isSubItem: true,
+    //       show: true,
+    //     },
+    //     {
+    //       type: 'link',
+    //       to: '/platform/infrastructure/health',
+    //       label: t('Health'),
+    //       isSubItem: true,
+    //       show: true,
+    //     },
+    //     {
+    //       type: 'link',
+    //       to: '/platform/infrastructure/triggers',
+    //       label: t('Triggers'),
+    //       isSubItem: true,
+    //       show: true,
+    //     },
+    //   ],
+    // },
   ];
   return (
     <AllowOnlyLoggedInUserOnlyGuard>

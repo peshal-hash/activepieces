@@ -263,7 +263,7 @@ export function SidebarComponent({
                           </SidebarMenuButton>
                         </SidebarMenuItem> */}
 
-
+{/*
                         <SidebarMenuItem>
                         <Collapsible defaultOpen={false} className="group/collapsible">
                             <CollapsibleTrigger asChild>
@@ -312,7 +312,7 @@ export function SidebarComponent({
                             </SidebarMenuSub>
                           </CollapsibleContent>
                         </Collapsible>
-                        </SidebarMenuItem>
+                        </SidebarMenuItem> */}
 
                         {showConnectionsLink && (
                           <SidebarMenuItem>
