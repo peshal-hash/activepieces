@@ -20,44 +20,7 @@ import re
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 router = APIRouter()
-from typing import Optional
-from fastapi import Request
-from urllib.parse import urlparse
 
-def get_request_origin(request: Request) -> Optional[str]:
-    """
-    Best-effort origin for the incoming request.
-    Priority: Origin → Referer → X-Forwarded-* → Host.
-    Returns 'scheme://host[:port]' or None.
-    """
-    h = request.headers
-
-    # 1) Origin header (fetch/XHR)
-    origin = h.get("origin")
-    if origin:
-        p = urlparse(origin)
-        if p.scheme in ("http", "https") and p.netloc:
-            return f"{p.scheme}://{p.netloc}"
-
-    # 2) Referer (top-level navigations, many GETs)
-    ref = h.get("referer") or h.get("referrer")
-    if ref:
-        p = urlparse(ref)
-        if p.scheme in ("http", "https") and p.netloc:
-            return f"{p.scheme}://{p.netloc}"
-
-    # 3) Behind proxies/CDNs
-    xf_host = (h.get("x-forwarded-host") or "").split(",")[0].strip()
-    xf_proto = (h.get("x-forwarded-proto") or request.url.scheme or "").split(",")[0].strip()
-    if xf_host and xf_proto in ("http", "https"):
-        return f"{xf_proto}://{xf_host}"
-
-    # 4) Fallback to this server's host
-    host = h.get("host")
-    if host and request.url.scheme in ("http", "https"):
-        return f"{request.url.scheme}://{host}"
-
-    return None
 
 
 PLAT_SEGMENT_RE = re.compile(
@@ -198,7 +161,7 @@ async def logout(request: Request):
     """
 
     # 2) Build a tiny page that wipes client storage (belt-and-suspenders)
-    redirect_url = get_request_origin(request) or config.CORS_ORIGINS[0].rstrip('/')
+    redirect_url = config.CORS_ORIGINS[0].rstrip('/')
 
     html = f"""
     <script>
