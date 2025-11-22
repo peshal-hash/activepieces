@@ -19,6 +19,8 @@ from ..database_management import db_manager
 import re
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
+import  logging
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -126,21 +128,21 @@ async def workflow(payload: WorkflowPayload,request: Request):
     if token==None:
         try:
             # This is the first attempt to sign in the user.
-            print("Attempting to sign in...")
+            logger.info("Attempting to sign in...")
             ap_data = await asyncio.to_thread(activepieces_service.sign_in, payload.email, payload.password)
-            print("Sign in successful.")
+            logger.info("Sign in successful.")
 
         # STEP 2: Broaden the exception catch. This now handles HTTP errors AND other network issues.
         except requests.RequestException as e:
-            print(f"Sign in failed with error: {e}. Attempting to sign up instead...")
+            logger.info(f"Sign in failed with error: {e}. Attempting to sign up instead...")
             try:
                 ap_data = await asyncio.to_thread(
                     activepieces_service.sign_up, payload.email, payload.password, payload.firstName, payload.lastName
                 )
-                print("Sign up successful.")
+                logger.info("Sign up successful.")
             except requests.RequestException as signup_error:
                 # If sign-up also fails, raise a clear error.
-                print(f"Sign up also failed: {signup_error}")
+                logger.info(f"Sign up also failed: {signup_error}")
                 raise HTTPException(status_code=401, detail=f"Activepieces auth failed on both sign-in and sign-up: {signup_error}")
 
         db_manager.store_user_data(ap_data)
@@ -151,6 +153,57 @@ async def workflow(payload: WorkflowPayload,request: Request):
     redirect_url_with_token = f"{config.AP_PROXY_URL.rstrip('/')}?{urlencode(redirect_params)}"
     resp = JSONResponse(content={"success": True, "redirectUrl": redirect_url_with_token,"token": token})
     return resp
+
+@router.get("/deleteuser", status_code=204)
+async def delete_user(request: Request):
+    # ----- Extract Bearer token -----
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    token = auth_header.split("Bearer ")[1].strip()
+
+    # ----- Decode AP JWT just to get the user id -----
+    try:
+        # We only need claims, so we can skip signature verification
+        payload = jwt.decode(
+                token,
+                config.JWT_SECRET_KEY,
+                algorithms=[config.JWT_ALGORITHM]
+            )
+        user_id = payload.get("id")
+        project_id=payload.get("projectId")
+        print("#################################################")
+        print(payload)
+        if not user_id:
+            logger.error("Activepieces token payload missing 'id': %s", payload)
+            raise HTTPException(status_code=400, detail="Token payload missing 'id'")
+    except Exception as e:
+        logger.error("Failed to decode Activepieces token: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    # ----- Call Activepieces delete -----
+    try:
+        await asyncio.to_thread(activepieces_service.purge_user, user_id,token)
+        logger.info("Deletion successful for Activepieces user %s", user_id)
+    except requests.HTTPError as e:
+        status = e.response.status_code if e.response is not None else 502
+        body = e.response.text if e.response is not None else str(e)
+        logger.error(
+            "Activepieces deletion failed for user %s: %s %s",
+            user_id, status, body,
+        )
+        raise HTTPException(
+            status_code=status if status >= 400 else 500,
+            detail=f"Activepieces deletion failed: {body}",
+        )
+    except requests.RequestException as e:
+        logger.error("Network error calling Activepieces delete: %s", e)
+        raise HTTPException(status_code=502, detail="Error contacting Activepieces API")
+
+    # On success FastAPI will return 204 No Content (status_code from decorator)
+    return Response(status_code=204)
+
 
 
 @router.get("/logout")
@@ -225,12 +278,12 @@ async def logout(request: Request):
     # Optional: help proxies/CDNs avoid cross-user cache bleed
     resp.headers["Vary"] = "Cookie"
 
-    print("=== LOGOUT: cleared proxy token, set Clear-Site-Data, expired cookies ===")
+    logger.info("=== LOGOUT: cleared proxy token, set Clear-Site-Data, expired cookies ===")
     return resp
 
 @router.api_route("/api/v1/webhooks/{rest_of_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def v1_webhook_handler(request: Request, rest_of_path: str):
-    print("\n✅ --- HTTP Webhook Intercepted! --- ✅")
+    logger.info("\n✅ --- HTTP Webhook Intercepted! --- ✅")
     from urllib.parse import parse_qsl, urlencode
     extra_qs=None
     headers = request.headers
@@ -256,8 +309,8 @@ async def v1_webhook_handler(request: Request, rest_of_path: str):
                 params=(q_params or None),          # <- None when empty to avoid "?"
                 content=body,
             )
-            print(f"response {resp}")
-            print(f"{resp.content}")
+            logger.info(f"response {resp}")
+            logger.info(f"{resp.content}")
     except httpx.RequestError as e:
         return Response(content=f"Proxy connection error on webhook: {e}", status_code=502)
 
@@ -286,7 +339,7 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
 
     origin = websocket.headers.get("origin")  # preserve Origin when present
 
-    print(f"WS TUNNEL: {websocket.url}  -->  {upstream_url}")
+    logger.info(f"WS TUNNEL: {websocket.url}  -->  {upstream_url}")
     close_code = 1000
 
     try:
@@ -361,7 +414,7 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
                     await t
 
     except Exception as e:
-        print(f"WS tunnel connect error: {e}")
+        logger.info(f"WS tunnel connect error: {e}")
         close_code = 1011  # Internal Error
 
     finally:
@@ -370,7 +423,7 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
                 await websocket.close(code=close_code)
             except Exception:
                 pass
-        print(f"WS tunnel closed with code: {close_code}")
+        logger.info(f"WS tunnel closed with code: {close_code}")
 
 
 
@@ -380,7 +433,7 @@ async def proxy_static_assets(request: Request, rest: str):
     This route specifically handles requests for static assets.
     It does NOT perform authentication and simply forwards the request.
     """
-    print(f"--- Asset proxy hit for: /assets/{rest} ---")
+    logger.info(f"--- Asset proxy hit for: /assets/{rest} ---")
 
     headers = _filtered_outgoing_headers(dict(request.headers))
     full_url = f"{config.AP_BASE_URL.rstrip('/')}/assets/{rest}"
@@ -388,7 +441,7 @@ async def proxy_static_assets(request: Request, rest: str):
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split("Bearer ")[1]
-        print("--- Found JWT in Authorization header. ---")
+        logger.info("--- Found JWT in Authorization header. ---")
     try:
         # Use httpx.AsyncClient for async requests
         async with httpx.AsyncClient(timeout=config.TIMEOUT) as client:
@@ -409,6 +462,11 @@ async def proxy_static_assets(request: Request, rest: str):
 async def ap_proxy(request: Request, rest: str = ""):
     # --- Parse/merge any accidental query string that snuck into `rest` ---
     # FastAPI normally strips it, but hardening for safety:
+    logger.info("REST INFORMATION")
+    logger.info(rest)
+    if rest == "deleteuser":
+        # call the real handler directly
+        return await delete_user(request)
     from urllib.parse import parse_qsl, urlencode
     token=None
     cookie_pid=None
@@ -451,7 +509,7 @@ async def ap_proxy(request: Request, rest: str = ""):
 
     elif auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split("Bearer ")[1]
-        print("--- Found JWT in Authorization header. ---")
+        logger.info("--- Found JWT in Authorization header. ---")
     else:
         token=None
 
@@ -470,14 +528,14 @@ async def ap_proxy(request: Request, rest: str = ""):
 
             if platform_object and isinstance(platform_object, dict):
                 cookie_platform_id = platform_object.get("id")
-            print("********************************************************")
-            print(payload)
-            print("********************************************************")
-            print("JWT decoded successfully. Using credentials from token.")
+            logger.info("********************************************************")
+            logger.info(payload)
+            logger.info("********************************************************")
+            logger.info("JWT decoded successfully. Using credentials from token.")
 
         except JWTError as e:
             # This handles expired tokens, invalid signatures, etc.
-            print(f"JWT decoding failed: {e}")
+            logger.info(f"JWT decoding failed: {e}")
             raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
 
     if token:
@@ -513,7 +571,7 @@ async def ap_proxy(request: Request, rest: str = ""):
             if path_pid != cookie_pid:
                 s, e = m_pf.span("pid")
                 rest = rest[:s] + cookie_pid + rest[e:]
-                print(f"[PROJECT-ID REWRITE:PATH projects/.../flows/...] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
+                logger.info(f"[PROJECT-ID REWRITE:PATH projects/.../flows/...] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
         else:
             # Any /projects/{pid} (use last occurrence if multiple)
             last = None
@@ -524,7 +582,7 @@ async def ap_proxy(request: Request, rest: str = ""):
                 if path_pid != cookie_pid:
                     s, e = last.span("pid")
                     rest = rest[:s] + cookie_pid + rest[e:]
-                    print(f"[PROJECT-ID REWRITE:PATH projects/...] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
+                    logger.info(f"[PROJECT-ID REWRITE:PATH projects/...] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
 
         # /api/v1/users/projects/{pid}
         m_up = USERS_PROJECT_RE.search(rest)
@@ -533,11 +591,11 @@ async def ap_proxy(request: Request, rest: str = ""):
             if path_pid != cookie_pid:
                 s, e = m_up.span("pid")
                 rest = rest[:s] + cookie_pid + rest[e:]
-                print(f"[PROJECT-ID REWRITE:PATH users/projects] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
+                logger.info(f"[PROJECT-ID REWRITE:PATH users/projects] '{path_pid}' -> '{cookie_pid}' in '{rest}'")
 
         # Query: normalize `projectId`
         if "projectId" in q_params and q_params["projectId"] != cookie_pid:
-            print(f"[PROJECT-ID REWRITE:QUERY] '{q_params['projectId']}' -> '{cookie_pid}'")
+            logger.info(f"[PROJECT-ID REWRITE:QUERY] '{q_params['projectId']}' -> '{cookie_pid}'")
             q_params["projectId"] = cookie_pid
 
     # Optional: upstream treats literal "NULL" poorly; drop it
@@ -545,22 +603,22 @@ async def ap_proxy(request: Request, rest: str = ""):
         q_params.pop("folderId", None)
 
     full_url = f"{config.AP_BASE_URL.rstrip('/')}/{rest.lstrip('/')}"
-    print("****************************************************************************")
-    print("these are the api and call made to general call")
-    print(f"{request.url.path}")
-    print(f"{rest}")
-    print("this is full url")
-    print(f"{full_url}")
-    print("these are the parameters")
-    print(q_params)
+    logger.info("****************************************************************************")
+    logger.info("these are the api and call made to general call")
+    logger.info(f"{request.url.path}")
+    logger.info(f"{rest}")
+    logger.info("this is full url")
+    logger.info(f"{full_url}")
+    logger.info("these are the parameters")
+    logger.info(q_params)
 
-    print("*****************************************************************************")
+    logger.info("*****************************************************************************")
 
     # Log without trailing '?' when there is no query
     qs = urlencode(q_params, doseq=True) if q_params else ""
     log_url = f"{full_url}{('?' + qs) if qs else ''}"
     try:
-        print(f"[UPSTREAM REQ] {request.method} {log_url}")
+        logger.info(f"[UPSTREAM REQ] {request.method} {log_url}")
     except Exception:
         pass
 
@@ -583,7 +641,7 @@ async def ap_proxy(request: Request, rest: str = ""):
     resp_content_type = resp.headers.get("Content-Type", "")
     if 400 <= resp.status_code < 600:
         try:
-            print(f"[UPSTREAM {resp.status_code}] {rest} -> {resp.text[:500]}")
+            logger.info(f"[UPSTREAM {resp.status_code}] {rest} -> {resp.text[:500]}")
         except Exception:
             pass
 

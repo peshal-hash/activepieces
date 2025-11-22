@@ -88,14 +88,9 @@ export const platformProjectController: FastifyPluginAsyncTypebox = async (app) 
     })
 
     app.delete('/:id', DeleteProjectRequest, async (req, res) => {
-        await platformMustBeOwnedByCurrentUser.call(app, req, res)
-        assertProjectToDeleteIsNotPrincipalProject(req.principal, req.params.id)
-
-        await platformProjectService(req.log).softDelete({
+        await platformProjectService(req.log).hardDelete({
             id: req.params.id,
-            platformId: req.principal.platform.id,
         })
-
         return res.status(StatusCodes.NO_CONTENT).send()
     })
 }

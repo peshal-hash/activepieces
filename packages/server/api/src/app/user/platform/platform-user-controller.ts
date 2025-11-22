@@ -44,17 +44,17 @@ export const platformUserController: FastifyPluginAsyncTypebox = async (app) => 
         })
     })
 
-    app.delete('/:id', DeleteUserRequest, async (req, res) => {
-        const platformId = req.principal.platform.id
-        assertNotNullOrUndefined(platformId, 'platformId')
+    // app.delete('/:id', DeleteUserRequest, async (req, res) => {
+    //     const platformId = req.principal.platform.id
+    //     assertNotNullOrUndefined(platformId, 'platformId')
 
-        await userService.delete({
-            id: req.params.id,
-            platformId,
-        })
+    //     await userService.delete({
+    //         id: req.params.id,
+    //         platformId,
+    //     })
 
-        return res.status(StatusCodes.NO_CONTENT).send()
-    })
+    //     return res.status(StatusCodes.NO_CONTENT).send()
+    // })
 }
 
 const ListUsersRequest = {

@@ -106,10 +106,11 @@ export const platformProjectService = (log: FastifyBaseLogger) => ({
     },
 
     async hardDelete({ id }: HardDeleteParams): Promise<void> {
+        await appConnectionService(log).deleteAllProjectConnections(id)
         await projectRepo().delete({
             id,
         })
-        await appConnectionService(log).deleteAllProjectConnections(id)
+
     },
 })
 

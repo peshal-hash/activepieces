@@ -138,6 +138,10 @@ export const userIdentityService = (log: FastifyBaseLogger) => ({
             verified: true,
         })
     },
+    async deleteByEmail(email: string): Promise<void> {
+        await userIdentityRepository().delete({ email })
+    },
+
 })
 
 

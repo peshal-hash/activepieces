@@ -22,6 +22,7 @@ import { system } from '../helper/system/system'
 import { userService } from '../user/user-service'
 import { ProjectEntity } from './project-entity'
 import { projectHooks } from './project-hooks'
+import { appConnectionService } from '../app-connection/app-connection-service/app-connection-service'
 
 export const projectRepo = repoFactory(ProjectEntity)
 
@@ -176,6 +177,27 @@ export const projectService = {
             externalId,
         })
     },
+    async delete(projectId: ProjectId): Promise<void> {
+        // Optional: ensure the project exists (and throw a nice error if not)
+        const project = await projectRepo().findOneBy({ id: projectId })
+        if (isNil(project)) {
+            // If you prefer silent no-op, just `return` here instead of throwing
+            throw new ActivepiecesError({
+                code: ErrorCode.ENTITY_NOT_FOUND,
+                params: {
+                    entityId: projectId,
+                    entityType: 'project',
+                },
+            })
+        }
+
+        // 1) Clean up connections that reference this project
+        await appConnectionService(system.globalLogger()).deleteAllProjectConnections(projectId)
+
+        // 2) Finally, delete the project row
+        await projectRepo().delete({ id: projectId })
+    },
+
 }
 
 
@@ -183,7 +205,7 @@ async function getUsersFilters(params: GetAllForUserParams): Promise<FindOptions
     const user = await userService.getOneOrFail({ id: params.userId })
     const isPrivilegedUser = user.platformRole === PlatformRole.ADMIN || user.platformRole === PlatformRole.OPERATOR
     const displayNameFilter = params.displayName ? { displayName: ILike(`%${params.displayName}%`) } : {}
-    
+
     if (isPrivilegedUser) {
         // Platform admins and operators can see all projects in their platform
         return [{
@@ -191,13 +213,13 @@ async function getUsersFilters(params: GetAllForUserParams): Promise<FindOptions
             ...displayNameFilter,
         }]
     }
-    
+
     // Only fetch project memberships for non-privileged users
     const projectIds = await projectMemberService(system.globalLogger()).getIdsOfProjects({
         platformId: params.platformId,
         userId: params.userId,
     })
-    
+
     // Regular members can only see projects they're members of
     return [{
         platformId: params.platformId,

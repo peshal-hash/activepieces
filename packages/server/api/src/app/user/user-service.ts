@@ -116,12 +116,31 @@ export const userService = {
     async getOneOrFail({ id }: IdParams): Promise<User> {
         return userRepo().findOneOrFail({ where: { id } })
     },
-    async delete({ id, platformId }: DeleteParams): Promise<void> {
-        await userRepo().delete({
-            id,
-            platformId,
-        })
-    },
+
+  async delete({ id, platformId }: DeleteParams): Promise<void> {
+    // Load the user first; if they don't exist, just exit
+    const user = await userRepo().findOneBy({ id, platformId })
+    if (isNil(user)) {
+      return
+    }
+
+    // If this user owns a platform, delete that platform first
+    if (user.platformId) {
+      const platform = await platformService.getOneOrThrow(user.platformId)
+
+      if (platform.ownerId === user.id) {
+        // 🧨 This is the relationship that causes fk_platform_user
+        // Delete the platform (which will delete its projects etc. if your platformService does that)
+        await platformService.hardDelete(platform.id)
+      }
+    }
+
+    // Now it's safe to delete the user, since no platform.row points to them anymore
+    await userRepo().delete({
+      id,
+      platformId,
+    })
+  },
 
     async getByPlatformRole(id: PlatformId, role: PlatformRole): Promise<UserSchema[]> {
         return userRepo().find({ where: { platformId: id, platformRole: role }, relations: { identity: true } })

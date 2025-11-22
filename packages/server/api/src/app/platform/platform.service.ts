@@ -180,6 +180,10 @@ export const platformService = {
             id,
         })
     },
+    async hardDelete(id: PlatformId): Promise<void> {
+        // 3) Finally delete the platform row itself
+        await platformRepo().delete({ id })
+    },
 }
 
 async function getUsage(platform: Platform): Promise<PlatformUsage | undefined> {
