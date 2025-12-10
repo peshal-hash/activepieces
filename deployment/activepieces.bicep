@@ -156,6 +156,9 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           allowedOrigins: [
             'https://gentle-grass-02d3f240f.1.azurestaticapps.net'
             'https://portal.salesoptai.com'
+            'https://portal.salesoptai.ai'
+            'https://portal.nexopta.com'
+            'https://portal.nexopta.ai'
             'http://localhost:3000'
           ]
           allowedMethods: ['*']
@@ -294,6 +297,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'AP_WEBSITE_NAME'
               value: 'SalesOptAi'
+            }
+            {
+              name: 'AP_FILE_STORAGE_LOCATION'
+              value: 'DB'
+            }
+            {
+              name: 'AP_MAX_FILE_SIZE_MB'
+              value: '50'
             }
           ]
         }
