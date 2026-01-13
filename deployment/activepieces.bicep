@@ -1,12 +1,11 @@
-// Bicep template for deploying Activepieces with Postgres and Redis
 
-// --- PARAMETERS ---
 param location string
 param salesoptapis string
 param environmentName string = 'testAPContainerEnvironment'
 param logAnalyticsWorkspaceName string = 'ap-logs-${uniqueString(resourceGroup().id)}'
 param acrName string = 'salesopttest'
 param appImageTag string = 'latest'
+param keyVaultName string = 'salesopt-kv-test'
 param revisionSuffix string = ''
 param containerAppName string
 param postgresServerName string
@@ -30,11 +29,16 @@ param jwtSecret string
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
 }
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
+  name: keyVaultName
+}
+
+
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: 'salesopt-container-identity'
 }
 
-// --- INFRASTRUCTURE (CONDITIONAL CREATION) ---
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = if (deployNewInfrastructure) {
   name: logAnalyticsWorkspaceName
   location: location
@@ -172,6 +176,29 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           identity: managedIdentity.id
         }
       ]
+      secrets: [
+        {
+          name: 'postgres-admin-password'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/POSTGRES-PASSWORD'
+          identity: managedIdentity.id
+        }
+        {
+          name: 'ap-secret-key'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/AP-SECRET-KEY'
+          identity: managedIdentity.id
+        }
+        {
+          name: 'ap-app-webhook-secrets'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/AP-APP-WEBHOOK-SECRETS'
+          identity: managedIdentity.id
+        }
+        {
+          name: 'ap-admin-key'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/AP-ADMIN-KEY'
+          identity: managedIdentity.id
+        }
+      ]
+
     }
     template: {
       revisionSuffix: revisionSuffix
@@ -202,7 +229,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_POSTGRES_PASSWORD'
-              value: postgresAdminPassword
+              secretRef: 'postgres-admin-password'
             }
             {
               name: 'AP_POSTGRES_USE_SSL'
@@ -284,15 +311,15 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_ADMIN_KEY'
-              value: '14eb8dc0_6ea2_S@lesOptAi_Admin_2025_47ec_9460_e479bcd1595c'
+              secretRef: 'ap-admin-key'
             }
             {
               name: 'AP_SECRET_KEY'
-              value: '0e9415d3_cd77_4e46_S@lesOptAi_2025_8416_5a0c76908a79'
+              secretRef: 'ap-secret-key'
             }
             {
               name: 'AP_APP_WEBHOOK_SECRETS'
-              value: '{"@activepieces/piece-slack":{"webhookSecret":"3c3de015679b94ba9f801225b9d087eb"}}'
+              secretRef: 'ap-app-webhook-secrets'
             }
             {
               name: 'AP_SALESOPTAI_URLS'

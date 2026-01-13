@@ -13,16 +13,18 @@ API_KEY="f379cfbee75176ebfe6f39b4b7dedf123b8cd54b8b5343180ee650625d5100532c5a9a9
 UNIQUE_ID=$(head -c 4 /dev/urandom | xxd -p)
 
 # App-specific name for the Activepieces container
-APP_NAME_ACTIVEPIECES="agentops"
+APP_NAME_ACTIVEPIECES="agentops-prod"
 # Names for your new Postgres and Redis resources
 POSTGRES_SERVER_NAME="salesopt-pg-server-dev-b7e59be4"
 POSTGRES_ADMIN_USER="salesoptadmin"
 REDIS_CACHE_NAME="salesopt-redis-cache-prod"
-SALESOPTAI_APIS="https://gentle-grass-02d3f240f.1.azurestaticapps.net , https://salesopt-app.redriver-d84691b9.eastus.azurecontainerapps.io, https://portal.salesoptai.com , https://portal.salesopt.ai , https://salesoptai-app-prod.icystone-9246cdc7.canadaeast.azurecontainerapps.io"
+SALESOPTAI_APIS="https://portal.salesoptai.com , https://gentle-grass-02d3f240f.1.azurestaticapps.net , https://salesopt-app.redriver-d84691b9.eastus.azurecontainerapps.io,  https://portal.salesopt.ai , https://salesoptai-app-prod.icystone-9246cdc7.canadaeast.azurecontainerapps.io"
 # POSTGRES_SERVER_NAME="salesopt-pg-server-dev-3fae475d"
 # POSTGRES_ADMIN_USER="salesoptadmin"
 # REDIS_CACHE_NAME="salesopt-redis-cache-dev-3fae475d"
 # SALESOPTAI_APIS="https://gentle-grass-02d3f240f.1.azurestaticapps.net"
+AP_MAX_FILE_SIZE_MB=
+AP_FILE_STORAGE_LOCATION=
 
 #make sure we don't deploy any new infrastructure.
 DEPLOY_NEW_INFRA='false'
