@@ -291,6 +291,10 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               value: '0e9415d3_cd77_4e46_S@lesOptAi_2025_8416_5a0c76908a79'
             }
             {
+              name: 'AP_APP_WEBHOOK_SECRETS'
+              value: '{"@activepieces/piece-slack":{"webhookSecret":"3c3de015679b94ba9f801225b9d087eb"}}'
+            }
+            {
               name: 'AP_SALESOPTAI_URLS'
               value: salesoptapis
             }
