@@ -92,7 +92,6 @@ function deploy_infrastructure() {
         jwtSecret="$JWT_SECRET" \
         acrName="$ACR_NAME" \
         keyVaultName="$KEY_VAULT_NAME" \
-        environmentName="$CONTAINER_APP_ENV_NAME" \
       --debug 1>&2; then
         write_error "Bicep deployment failed. See debug output above for details."
         exit 1
