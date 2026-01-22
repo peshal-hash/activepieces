@@ -47,7 +47,7 @@ export function DashboardContainer({ children }: DashboardContainerProps) {
   const { checkAccess } = useAuthorization();
   const { data: edition } = flagsHooks.useFlag<ApEdition>(ApFlagId.EDITION);
   const { data: showBilling } = flagsHooks.useFlag<boolean>(
-    ApFlagId.SHOW_BILLING,
+    ApFlagId.SHOW_BILLING_PAGE,
   );
 
   const [isAlertClosed, setIsAlertClosed] = useState(false);

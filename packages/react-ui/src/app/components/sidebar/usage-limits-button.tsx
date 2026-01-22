@@ -145,7 +145,7 @@ const UsageLimitsButton = React.memo(() => {
               <Rocket className="w-4 h-4 mr-2" />
               {t('Upgrade Plan')}
             </Button>
-            <FlagGuard flag={ApFlagId.SHOW_BILLING}>
+            <FlagGuard flag={ApFlagId.SHOW_BILLING_PAGE}>
               <Link
                 to={'/setup/billing'}
                 className={cn(
@@ -164,7 +164,7 @@ const UsageLimitsButton = React.memo(() => {
               {t('Usage resets in')}{' '}
               {getTimeUntilNextReset(project.usage.nextLimitResetDate)}{' '}
             </span>
-            <FlagGuard flag={ApFlagId.SHOW_BILLING}>
+            <FlagGuard flag={ApFlagId.SHOW_BILLING_PAGE}>
               <Link to={'/setup/billing'} className="w-fit">
                 <span className="text-xs text-primary underline">
                   {t('Manage')}
