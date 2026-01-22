@@ -5,7 +5,7 @@ param environmentName string = 'testAPContainerEnvironment'
 param logAnalyticsWorkspaceName string = 'ap-logs-${uniqueString(resourceGroup().id)}'
 param acrName string
 param appImageTag string = 'latest'
-param keyVaultName string = 'salesoptai-prod-keyvault'
+param keyVaultName string = 'salesopt-kv-test'
 param revisionSuffix string = ''
 param containerAppName string
 param postgresServerName string
