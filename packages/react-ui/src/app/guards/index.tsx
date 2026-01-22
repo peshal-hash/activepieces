@@ -545,23 +545,21 @@ const routes = [
         <PageTitle title="Platform Setup">
           <Navigate to="/platform/setup/ai" replace />
         </PageTitle>
-      </PageTitle>
-      </PlatformLayout >
+      </PlatformLayout>
     ),
   },
-{
-  path: '/infrastructure',
+  {
+    path: '/infrastructure',
     element: (
       <PlatformLayout>
         <PageTitle title="Platform Infrastructure">
           <Navigate to="/platform/infrastructure/workers" replace />
         </PageTitle>
-      </PageTitle>
-      </PlatformLayout >
+      </PlatformLayout>
     ),
-},
-{
-  path: '/platform/security',
+  },
+  {
+    path: '/platform/security',
     element: (
       <PlatformLayout>
         <PageTitle title="Platform Security">
@@ -570,12 +568,12 @@ const routes = [
       </PlatformLayout>
     ),
   },
-{
-  path: '/redirect',
+  {
+    path: '/redirect',
     element: <RedirectPage></RedirectPage>,
   },
-{
-  path: '/projects/:projectId',
+  {
+    path: '/projects/:projectId',
     element: (
       <TokenCheckerWrapper>
         <DefaultRoute></DefaultRoute>

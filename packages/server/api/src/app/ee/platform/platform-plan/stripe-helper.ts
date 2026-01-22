@@ -137,9 +137,7 @@ export const stripeHelper = (log: FastifyBaseLogger) => ({
             return `/setup/billing/success?action=${isUpgrade ? 'upgrade' : 'downgrade'}`
         }
         catch (error) {
-            log.error(`Failed to update subscription ${error} `, {
-                subscriptionId,
-            })
+            log.error({ err: error, subscriptionId }, 'Failed to update subscription')
             return '/setup/billing/error'
         }
     },
