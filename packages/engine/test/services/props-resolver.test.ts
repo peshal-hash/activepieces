@@ -1,4 +1,4 @@
-import { ApFile, PieceAuth, Property } from '@activepieces/pieces-framework'
+import { ApFile, LATEST_CONTEXT_VERSION, PieceAuth, Property } from '@activepieces/pieces-framework'
 import { FlowActionType, FlowTriggerType, GenericStepOutput, PropertyExecutionType, PropertySettings, StepOutputStatus } from '@activepieces/shared'
 import { FlowExecutorContext } from '../../src/lib/handler/context/flow-execution-context'
 import { StepExecutionPath } from '../../src/lib/handler/context/step-execution-path'
@@ -9,6 +9,8 @@ const propsResolverService = createPropsResolver({
     projectId: 'PROJECT_ID',
     engineToken: 'WORKER_TOKEN',
     apiUrl: 'http://127.0.0.1:3000',
+    contextVersion: LATEST_CONTEXT_VERSION,
+    stepNames: ['trigger', 'step_1', 'step_2', 'step_3', 'step_4', 'step_5', 'step_6', 'step_7', 'step_8'],
 })
 
 const executionState = FlowExecutorContext.empty()
@@ -57,6 +59,8 @@ const executionState = FlowExecutorContext.empty()
 
 
 describe('Props resolver', () => {
+
+
     test('Test resolve inside nested loops', async () => {
 
         const modifiedExecutionState = executionState.upsertStep('step_3', GenericStepOutput.create({
@@ -561,6 +565,7 @@ describe('Props resolver', () => {
         }
         const props = {
             dynamicProp: Property.DynamicProperties({
+                auth: undefined,
                 displayName: 'Dynamic Property',
                 required: true,
                 props: async () => {
@@ -681,6 +686,39 @@ describe('Array Flatter Processor', () => {
         ])
         expect(errors).toEqual({})
     })
+
+    it('should convert number to string for ShortText properties', async () => {
+        const input = {
+            items: {
+                id: 123,
+                name: 'Item Name',
+            },
+        }
+        const props = {
+            items: Property.Array({
+                displayName: 'Items',
+                required: true,
+                properties: {
+                    id: Property.ShortText({
+                        displayName: 'ID',
+                        required: true,
+                    }),
+                    name: Property.LongText({
+                        displayName: 'Name',
+                        required: true,
+                    }),
+                },
+            }),
+        }
+
+        const { processedInput, errors } = await propsProcessor.applyProcessorsAndValidators(input, props, PieceAuth.None(), false, {})
+
+        expect(processedInput.items).toEqual([
+            { id: '123', name: 'Item Name' },
+        ])
+        expect(errors).toEqual({})
+    })
+
 
     it('should handle arrays with string values', async () => {
         const input = {

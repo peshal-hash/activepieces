@@ -1,6 +1,6 @@
 import { Flow, Project, TriggerSource } from '@activepieces/shared'
 import { EntitySchema } from 'typeorm'
-import { BaseColumnSchemaPart, JSONB_COLUMN_TYPE, TIMESTAMP_COLUMN_TYPE } from '../../database/database-common'
+import { BaseColumnSchemaPart } from '../../database/database-common'
 
 export type TriggerSourceSchema = TriggerSource & {
     flow: Flow
@@ -12,10 +12,10 @@ export const TriggerSourceEntity = new EntitySchema<TriggerSourceSchema>({
     columns: {
         ...BaseColumnSchemaPart,
         deleted: {
-            type: TIMESTAMP_COLUMN_TYPE,
+            type: 'timestamp with time zone',
             deleteDate: true,
             nullable: true,
-        }, 
+        },
         flowId: {
             type: String,
             nullable: false,
@@ -24,9 +24,9 @@ export const TriggerSourceEntity = new EntitySchema<TriggerSourceSchema>({
             type: String,
             nullable: false,
         },
-        handshakeConfiguration: {
-            type: JSONB_COLUMN_TYPE,
-            nullable: true,
+        triggerName: {
+            type: String,
+            nullable: false,
         },
         projectId: {
             type: String,
@@ -37,7 +37,7 @@ export const TriggerSourceEntity = new EntitySchema<TriggerSourceSchema>({
             nullable: false,
         },
         schedule: {
-            type: JSONB_COLUMN_TYPE,
+            type: 'jsonb',
             nullable: true,
         },
         pieceName: {
@@ -65,6 +65,16 @@ export const TriggerSourceEntity = new EntitySchema<TriggerSourceSchema>({
             name: 'idx_trigger_flow_id_simulate',
             where: 'deleted IS NULL',
             unique: true,
+        },
+        {
+            columns: ['flowId'],
+            name: 'idx_trigger_flow_id',
+            unique: false,
+        },
+        {
+            columns: ['projectId'],
+            name: 'idx_trigger_project_id',
+            unique: false,
         },
     ],
     relations: {

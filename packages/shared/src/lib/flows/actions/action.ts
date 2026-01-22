@@ -2,7 +2,6 @@ import { Static, Type } from '@sinclair/typebox'
 import { VersionType } from '../../pieces'
 import { PropertySettings } from '../properties'
 import { SampleDataSetting } from '../sample-data'
-import { PieceTriggerSettings } from '../triggers/trigger'
 
 export enum FlowActionType {
     CODE = 'CODE',
@@ -36,12 +35,12 @@ export const ActionErrorHandlingOptions = Type.Optional(
     Type.Object({
         continueOnFailure: Type.Optional(
             Type.Object({
-                value: Type.Boolean(),
+                value: Type.Optional(Type.Boolean()),
             }),
         ),
         retryOnFailure: Type.Optional(
             Type.Object({
-                value: Type.Boolean(),
+                value: Type.Optional(Type.Boolean()),
             }),
         ),
     }),
@@ -342,12 +341,6 @@ export type CodeAction = Static<typeof CodeActionSchema> & {
     nextAction?: FlowAction
 }
 
-export type StepSettings =
-  | CodeActionSettings
-  | PieceActionSettings
-  | PieceTriggerSettings
-  | RouterActionSettings
-  | LoopOnItemsActionSettings
 
 export const emptyCondition: ValidBranchCondition = {
     firstValue: '',

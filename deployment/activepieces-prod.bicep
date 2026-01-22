@@ -1,12 +1,11 @@
-// Bicep template for deploying Activepieces with Postgres and Redis
 
-// --- PARAMETERS ---
 param location string
 param salesoptapis string
 param environmentName string = 'testAPContainerEnvironment'
 param logAnalyticsWorkspaceName string = 'ap-logs-${uniqueString(resourceGroup().id)}'
-param acrName string = 'salesopttest'
+param acrName string
 param appImageTag string = 'latest'
+param keyVaultName string = 'salesoptai-prod-keyvault'
 param revisionSuffix string = ''
 param containerAppName string
 param postgresServerName string
@@ -26,15 +25,19 @@ param encryptionKey string
 @secure()
 param jwtSecret string
 
-// --- EXISTING RESOURCES ---
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
 }
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
+  name: keyVaultName
+}
+
+
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: 'salesopt-container-identity'
 }
 
-// --- INFRASTRUCTURE (CONDITIONAL CREATION) ---
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = if (deployNewInfrastructure) {
   name: logAnalyticsWorkspaceName
   location: location
@@ -63,6 +66,7 @@ resource environment 'Microsoft.App/managedEnvironments@2023-05-01' = if (deploy
   }
 }
 
+
 resource existingEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
   name: environmentName
 }
@@ -88,10 +92,6 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-pr
   }
 }
 
-// --- THE CHANGE IS HERE ---
-// This resource adds a firewall rule to the PostgreSQL server.
-// The IP range 0.0.0.0 to 0.0.0.0 is a special rule that allows
-// all Azure services to connect to the database.
 resource postgresFirewallRule 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-03-01-preview' = if (deployNewInfrastructure) {
   parent: postgresServer
   name: 'AllowAllWindowsAzureIps'
@@ -156,6 +156,9 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           allowedOrigins: [
             'https://gentle-grass-02d3f240f.1.azurestaticapps.net'
             'https://portal.salesoptai.com'
+            'https://portal.salesoptai.ai'
+            'https://portal.nexopta.com'
+            'https://portal.nexopta.ai'
             'http://localhost:3000'
           ]
           allowedMethods: ['*']
@@ -169,6 +172,29 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           identity: managedIdentity.id
         }
       ]
+      secrets: [
+        {
+          name: 'postgres-admin-password'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/POSTGRES-PASSWORD'
+          identity: managedIdentity.id
+        }
+        {
+          name: 'ap-secret-key'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/AP-SECRET-KEY'
+          identity: managedIdentity.id
+        }
+        {
+          name: 'ap-app-webhook-secrets'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/AP-APP-WEBHOOK-SECRETS'
+          identity: managedIdentity.id
+        }
+        {
+          name: 'ap-admin-key'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/AP-ADMIN-KEY'
+          identity: managedIdentity.id
+        }
+      ]
+
     }
     template: {
       revisionSuffix: revisionSuffix
@@ -199,7 +225,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_POSTGRES_PASSWORD'
-              value: postgresAdminPassword
+              secretRef: 'postgres-admin-password'
             }
             {
               name: 'AP_POSTGRES_USE_SSL'
@@ -281,11 +307,15 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_ADMIN_KEY'
-              value: '14eb8dc0_6ea2_S@lesOptAi_Admin_2025_47ec_9460_e479bcd1595c'
+              secretRef: 'ap-admin-key'
             }
             {
               name: 'AP_SECRET_KEY'
-              value: '0e9415d3_cd77_4e46_S@lesOptAi_2025_8416_5a0c76908a79'
+              secretRef: 'ap-secret-key'
+            }
+            {
+              name: 'AP_APP_WEBHOOK_SECRETS'
+              secretRef: 'ap-app-webhook-secrets'
             }
             {
               name: 'AP_SALESOPTAI_URLS'
@@ -294,6 +324,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'AP_WEBSITE_NAME'
               value: 'SalesOptAi'
+            }
+            {
+              name: 'AP_FILE_STORAGE_LOCATION'
+              value: 'DB'
+            }
+            {
+              name: 'AP_MAX_FILE_SIZE_MB'
+              value: '50'
             }
           ]
         }

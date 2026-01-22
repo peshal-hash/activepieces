@@ -1,5 +1,4 @@
 {
-  "Pipedrive": "Pipedrive",
   "Sales CRM and pipeline management software": "CRM de vendas e software de gerenciamento de pipeline",
   "Add Follower": "Adicionar seguidor",
   "Retrieve a Note": "Recuperar uma Nota",
@@ -18,6 +17,7 @@
   "Create Person": "Criar Pessoa",
   "Update Person": "Atualizar pessoa",
   "Create Product": "Criar Produto",
+  "Update Product": "Atualização do produto",
   "Find Deals Associated With Person": "Encontrar ofertas associadas com pessoas",
   "Find Product": "Encontrar produto",
   "Find Products": "Encontrar produtos",

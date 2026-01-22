@@ -1,5 +1,4 @@
 {
-  "Activepieces Platform": "Activeepieces Platform",
   "Open source no-code business automation": "オープンソースコードのない業務自動化",
   "Base URL": "ベースURL",
   "API Key": "API キー",
@@ -15,7 +14,6 @@
   "Display Name": "表示名",
   "Id": "Id",
   "Notify Status": "ステータスを通知する",
-  "Tasks": "タスク",
   "Team Members": "チーム メンバー",
   "Method": "方法",
   "Headers": "ヘッダー",

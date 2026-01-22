@@ -1,11 +1,11 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
+import { authenticationSession } from '@/lib/authentication-session';
 import {
   FlowAction,
   FlowActionType,
   FlowTriggerType,
-  flowStructureUtil,
   LocalesEnum,
   SuggestionType,
   FlowTrigger,
@@ -24,7 +24,7 @@ import {
 } from './step-utils';
 
 export const stepsHooks = {
-  useStepMetadata: ({ step, enabled = true }: UseStepMetadata) => {
+  useStepMetadata: ({ step }: UseStepMetadata) => {
     const { i18n } = useTranslation();
     const query = useQuery<
       StepMetadataWithActionOrTriggerOrAgentDisplayName,
@@ -32,7 +32,6 @@ export const stepsHooks = {
     >({
       queryKey: getQueryKeyForStepMetadata(step, i18n.language as LocalesEnum),
       queryFn: () => stepUtils.getMetadata(step, i18n.language as LocalesEnum),
-      enabled,
     });
     return {
       stepMetadata: query.data,
@@ -55,73 +54,74 @@ export const stepsHooks = {
       }),
     });
   },
-useAllStepsMetadata: ({ searchQuery, type, enabled }: UseMetadataProps) => {
-  const { i18n } = useTranslation();
+  useAllStepsMetadata: ({ searchQuery, type, enabled }: UseMetadataProps) => {
+    const { i18n } = useTranslation();
 
-  // --- helper to identify "Agent" piece(s)
-  const isAgentPiece = (piece: { name?: string; displayName?: string }) => {
-    const name = (piece.name ?? '').toLowerCase();
-    const display = (piece.displayName ?? '').toLowerCase();
-    // hard block the official agent piece by package name, plus any that say "agent"
-    return (
-      name === '@activepieces/piece-agent' ||
-      /\bagents?\b/.test(name) ||
-      /\bagents?\b/.test(display)
-    );
-  };
-
-  const query = useQuery<StepMetadataWithSuggestions[], Error>({
-    queryKey: ['pieces-metadata', searchQuery, type],
-    queryFn: async () => {
-      const pieces = await piecesApi.list({
-        searchQuery,
-        suggestionType:
-          type === 'action' ? SuggestionType.ACTION : SuggestionType.TRIGGER,
-        locale: i18n.language as LocalesEnum,
-      });
-
-      // keep only items that have suggestions for the requested mode…
-      const filteredBySuggestionType = pieces.filter(
-        (piece) =>
-          (type === 'action' && piece.actions > 0) ||
-          (type === 'trigger' && piece.triggers > 0),
+    // --- helper to identify "Agent" piece(s)
+    const isAgentPiece = (piece: { name?: string; displayName?: string }) => {
+      const name = (piece.name ?? '').toLowerCase();
+      const display = (piece.displayName ?? '').toLowerCase();
+      // hard block the official agent piece by package name, plus any that say "agent"
+      return (
+        name === '@activepieces/piece-agent' ||
+        /\bagents?\b/.test(name) ||
+        /\bagents?\b/.test(display)
       );
+    };
 
-      // …and drop Agent items entirely
-      const withoutAgent = filteredBySuggestionType.filter(
-        (p) => !isAgentPiece(p),
-      );
+    const query = useQuery<StepMetadataWithSuggestions[], Error>({
+      queryKey: ['pieces-metadata', searchQuery, type],
+      queryFn: async () => {
+        const pieces = await piecesApi.list({
+          projectId: authenticationSession.getProjectId()!,
+          searchQuery,
+          suggestionType:
+            type === 'action' ? SuggestionType.ACTION : SuggestionType.TRIGGER,
+          locale: i18n.language as LocalesEnum,
+        });
 
-      const piecesMetadata = withoutAgent.map((piece) => {
-        const metadata = stepUtils.mapPieceToMetadata({ piece, type });
-        return {
-          ...metadata,
-          suggestedActions: piece.suggestedActions,
-          suggestedTriggers: piece.suggestedTriggers,
-        };
-      });
+        // keep only items that have suggestions for the requested mode…
+        const filteredBySuggestionType = pieces.filter(
+          (piece) =>
+            (type === 'action' && piece.actions > 0) ||
+            (type === 'trigger' && piece.triggers > 0),
+        );
 
-      switch (type) {
-        case 'action': {
-          const filteredCoreActions = CORE_ACTIONS_METADATA.filter((step) =>
-            passSearch(searchQuery, step),
-          );
-          return [...filteredCoreActions, ...piecesMetadata];
+        // …and drop Agent items entirely
+        const withoutAgent = filteredBySuggestionType.filter(
+          (p) => !isAgentPiece(p),
+        );
+
+        const piecesMetadata = withoutAgent.map((piece) => {
+          const metadata = stepUtils.mapPieceToMetadata({ piece, type });
+          return {
+            ...metadata,
+            suggestedActions: piece.suggestedActions,
+            suggestedTriggers: piece.suggestedTriggers,
+          };
+        });
+
+        switch (type) {
+          case 'action': {
+            const filteredCoreActions = CORE_ACTIONS_METADATA.filter((step) =>
+              passSearch(searchQuery, step),
+            );
+            return [...filteredCoreActions, ...piecesMetadata];
+          }
+          case 'trigger':
+            return [...piecesMetadata];
         }
-        case 'trigger':
-          return [...piecesMetadata];
-      }
-    },
-    enabled,
-    staleTime: searchQuery ? 0 : Infinity,
-  });
+      },
+      enabled,
+      staleTime: searchQuery ? 0 : Infinity,
+    });
 
-  return {
-    refetch: query.refetch,
-    metadata: query.data,
-    isLoading: query.isLoading,
-  };
-},
+    return {
+      refetch: query.refetch,
+      metadata: query.data,
+      isLoading: query.isLoading,
+    };
+  },
 
 };
 function passSearch(
@@ -138,7 +138,6 @@ function passSearch(
 
 type UseStepMetadata = {
   step: FlowAction | FlowTrigger;
-  enabled?: boolean;
 };
 
 type UseMetadataProps = {
@@ -156,7 +155,18 @@ const getQueryKeyForStepMetadata = (
   const pieceName = isPieceStep ? step.settings.pieceName : undefined;
   const pieceVersion = isPieceStep ? step.settings.pieceVersion : undefined;
   const customLogoUrl =
-    'customLogoUrl' in step ? step.customLogoUrl : undefined;
-  const agentId = flowStructureUtil.getExternalAgentId(step);
-  return [pieceName, pieceVersion, customLogoUrl, agentId, locale, step.type];
+    'customLogoUrl' in step ? (step.customLogoUrl as string) : undefined;
+  const actionName =
+    step.type === FlowActionType.PIECE ? step.settings.actionName : undefined;
+  const triggerName =
+    step.type === FlowTriggerType.PIECE ? step.settings.triggerName : undefined;
+  return [
+    actionName,
+    triggerName,
+    pieceName,
+    pieceVersion,
+    customLogoUrl,
+    locale,
+    step.type,
+  ];
 };

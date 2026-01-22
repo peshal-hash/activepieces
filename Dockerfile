@@ -1,88 +1,113 @@
-# syntax=docker/dockerfile:1.6
-FROM node:18.20.5-bullseye-slim AS base
+FROM node:20.19-bullseye-slim AS base
 
-# ---- Tooling & system deps (cached) ----
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update && apt-get install -y --no-install-recommends \
-  openssh-client \
-  python3 \
-  python3-pip \
-  g++ \
-  build-essential \
-  git \
-  poppler-utils \
-  poppler-data \
-  procps \
-  locales \
-  locales-all \
-  libcap-dev \
-  && rm -rf /var/lib/apt/lists/*
-
-# Node tooling
-RUN yarn config set python /usr/bin/python3 && npm i -g node-gyp
-RUN npm i -g npm@9.9.3 pnpm@9.15.0
-
-# Locale & Nx
+# Set environment variables early for better layer caching
 ENV LANG=en_US.UTF-8 \
-  LANGUAGE=en_US:en \
-  LC_ALL=en_US.UTF-8 \
-  NX_DAEMON=false
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8 \
+    NX_DAEMON=false \
+    NX_NO_CLOUD=true
 
-# Optional: warm caches to speed builds
-RUN cd /usr/src && npm i isolated-vm@5.0.1
-RUN pnpm store add @tsconfig/node18@1.0.0 @types/node@18.17.1 typescript@4.9.4
+# Install all system dependencies in a single layer with cache mounts
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    openssh-client \
+    python3 \
+    g++ \
+    build-essential \
+    git \
+    poppler-utils \
+    poppler-data \
+    procps \
+    locales \
+    locales-all \
+    unzip \
+    curl \
+    ca-certificates \
+    libcap-dev && \
+    yarn config set python /usr/bin/python3
 
-# ------------ BUILD STAGE ------------
+RUN export ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+    curl -fSL https://github.com/oven-sh/bun/releases/download/bun-v1.3.1/bun-linux-x64-baseline.zip -o bun.zip; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+    curl -fSL https://github.com/oven-sh/bun/releases/download/bun-v1.3.1/bun-linux-aarch64.zip -o bun.zip; \
+    fi
+
+RUN unzip bun.zip \
+    && mv bun-*/bun /usr/local/bin/bun \
+    && chmod +x /usr/local/bin/bun \
+    && rm -rf bun.zip bun-*
+
+RUN bun --version
+
+# Install global npm packages in a single layer
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g --no-fund --no-audit \
+    node-gyp \
+    npm@9.9.3 \
+    pm2@6.0.10 \
+    typescript@4.9.4
+
+# Install isolated-vm globally (needed for sandboxes)
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    cd /usr/src && bun install isolated-vm@5.0.1
+
+### STAGE 1: Build ###
 FROM base AS build
+
 WORKDIR /usr/src/app
 
-# Install deps
-COPY .npmrc package.json package-lock.json ./
-RUN npm ci
+# Copy only dependency files first for better layer caching
+COPY .npmrc package.json bun.lock ./
 
-# Copy source and build
+# Install all dependencies with frozen lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
+
+# Copy source code after dependency installation
 COPY . .
-RUN npx nx run-many --target=build --projects=server-api --configuration=production
-RUN npx nx run-many --target=build --projects=react-ui
 
-# Install production deps for the built server (once)
-WORKDIR /usr/src/app/dist/packages/server/api
-RUN npm install --production --force
+# Build both projects (already has NX_NO_CLOUD from base stage)
+RUN npx nx run-many --target=build --projects=react-ui,server-api --configuration production --parallel=2 --skip-nx-cache
+
+# Install production dependencies only for the backend API
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    cd dist/packages/server/api && \
+    bun install --production --frozen-lockfile
 
 # ------------ RUNTIME STAGE ------------
 FROM base AS run
-ENV NODE_ENV=production
+
 WORKDIR /usr/src/app
 
-# Nginx for serving React UI; gettext for envsubst; clean afterward
+# Install Nginx and gettext in a single layer with cache mount
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update && apt-get install -y --no-install-recommends \
-  nginx \
-  gettext \
-  && rm -rf /var/lib/apt/lists/*
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends nginx gettext
 
-# --- CHANGE IS HERE ---
-# Copy the new Nginx configuration that listens on port 5000
+# Copy static configuration files first (better layer caching)
 COPY nginx.react.conf /etc/nginx/nginx.conf
-COPY --from=build /usr/src/app/LICENSE .
+COPY --from=build /usr/src/app/packages/server/api/src/assets/default.cf /usr/local/etc/isolate
+COPY docker-entrypoint.sh .
 
-# Create dirs for clarity (optional)
-RUN mkdir -p /usr/src/app/dist/packages/{server,engine,shared}
+# Create all necessary directories in one layer
+RUN mkdir -p \
+    /usr/src/app/dist/packages/server \
+    /usr/src/app/dist/packages/engine \
+    /usr/src/app/dist/packages/shared && \
+    chmod +x docker-entrypoint.sh
 
 # Copy built artifacts from build stage
-COPY --from=build /usr/src/app/dist/packages/engine/  /usr/src/app/dist/packages/engine/
-COPY --from=build /usr/src/app/dist/packages/server/  /usr/src/app/dist/packages/server/
-COPY --from=build /usr/src/app/dist/packages/shared/  /usr/src/app/dist/packages/shared/
+COPY --from=build /usr/src/app/LICENSE .
+COPY --from=build /usr/src/app/dist/packages/engine/ ./dist/packages/engine/
+COPY --from=build /usr/src/app/dist/packages/server/ ./dist/packages/server/
+COPY --from=build /usr/src/app/dist/packages/shared/ ./dist/packages/shared/
+COPY --from=build /usr/src/app/packages ./packages
 
-# Copy production node_modules produced in build stage (avoid reinstall)
-COPY --from=build /usr/src/app/dist/packages/server/api/node_modules /usr/src/app/dist/packages/server/api/node_modules
-
-# Copy runtime packages (if your server uses code from here at runtime)
-COPY --from=build /usr/src/app/packages /usr/src/app/packages
-
-# Copy the built React UI into Nginx document root
+# Copy frontend files to Nginx document root
 COPY --from=build /usr/src/app/dist/packages/react-ui /usr/share/nginx/html/
 
 # --- Add Python Application ---
@@ -106,4 +131,4 @@ EXPOSE 5000
 # --- CHANGE IS HERE ---
 # Update the health check to target port 5000
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
-  CMD curl -fsS http://127.0.0.1:5000/ || exit 1
+    CMD curl -fsS http://127.0.0.1:5000/ || exit 1

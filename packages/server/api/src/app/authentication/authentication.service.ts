@@ -1,6 +1,6 @@
 import { OtpType } from '@activepieces/ee-shared'
 import { cryptoUtils } from '@activepieces/server-shared'
-import { ActivepiecesError, ApEdition, ApFlagId, assertNotNullOrUndefined, AuthenticationResponse, ErrorCode, isNil, PlatformRole, PlatformWithoutSensitiveData, User, UserIdentity, UserIdentityProvider } from '@activepieces/shared'
+import { ActivepiecesError, ApEdition, ApFlagId, assertNotNullOrUndefined, AuthenticationResponse, ErrorCode, isNil, PlatformRole, PlatformWithoutSensitiveData, ProjectType, User, UserIdentity, UserIdentityProvider } from '@activepieces/shared'
 import { FastifyBaseLogger } from 'fastify'
 import { otpService } from '../ee/authentication/otp/otp-service'
 import { flagService } from '../flags/flag.service'
@@ -41,13 +41,13 @@ export const authenticationService = (log: FastifyBaseLogger) => ({
             ...params,
             verified: true,
         })
-        const user = await userService.create({
-            identityId: userIdentity.id,
-            platformRole: PlatformRole.MEMBER,
+        const user = await userService.getOrCreateWithProject({
+            identity: userIdentity,
             platformId: params.platformId,
         })
         await userInvitationsService(log).provisionUserInvitation({
             email: params.email,
+            user,
         })
 
         return authenticationUtils.getProjectAndToken({
@@ -105,6 +105,7 @@ export const authenticationService = (log: FastifyBaseLogger) => ({
                 provider: params.provider,
                 platformId: null,
                 password: await cryptoUtils.generateRandomPassword(),
+                imageUrl: params.imageUrl,
             })
         }
         if (isNil(userIdentity)) {
@@ -117,16 +118,17 @@ export const authenticationService = (log: FastifyBaseLogger) => ({
                 provider: params.provider,
                 platformId,
                 password: await cryptoUtils.generateRandomPassword(),
+                imageUrl: params.imageUrl,
             })
         }
-        await userInvitationsService(log).provisionUserInvitation({
-            email: params.email,
-        })
-        const user = await userService.getOneByIdentityAndPlatform({
-            identityId: userIdentity.id,
+        const user = await userService.getOrCreateWithProject({
+            identity: userIdentity,
             platformId,
         })
-        assertNotNullOrUndefined(user, 'User Identity is found but not the user')
+        await userInvitationsService(log).provisionUserInvitation({
+            email: params.email,
+            user,
+        })
         return authenticationUtils.getProjectAndToken({
             userId: user.id,
             platformId,
@@ -144,17 +146,6 @@ export const authenticationService = (log: FastifyBaseLogger) => ({
             userId: user.id,
             platformId: platform.id,
             projectId: null,
-        })
-    },
-    async switchProject(params: SwitchProjectParams): Promise<AuthenticationResponse> {
-        const project = await projectService.getOneOrThrow(params.projectId)
-        const projectPlatform = await platformService.getOneWithPlanOrThrow(project.platformId)
-        await assertUserCanSwitchToPlatform(params.currentPlatformId, projectPlatform)
-        const user = await getUserForPlatform(params.identityId, projectPlatform)
-        return authenticationUtils.getProjectAndToken({
-            userId: user.id,
-            platformId: project.platformId,
-            projectId: params.projectId,
         })
     },
 })
@@ -214,9 +205,11 @@ async function createUserAndPlatform(userIdentity: UserIdentity, log: FastifyBas
         displayName: userIdentity.firstName + '\'s Project',
         ownerId: user.id,
         platformId: platform.id,
+        type: ProjectType.PERSONAL,
     })
 
     const cloudEdition = system.getEdition()
+
     switch (cloudEdition) {
         case ApEdition.CLOUD:
             await otpService(log).createAndSend({
@@ -259,16 +252,16 @@ async function getPersonalPlatformIdForFederatedAuthn(email: string, log: Fastif
 }
 
 async function getPersonalPlatformIdForIdentity(identityId: string): Promise<string | null> {
-  const edition = system.getEdition()
-  const personalMode = (process.env.AP_PUBLIC_SIGNUP_PERSONAL || '').toLowerCase() === 'true'
+    const edition = system.getEdition()
+    const personalMode = (process.env.AP_PUBLIC_SIGNUP_PERSONAL || '').toLowerCase() === 'true'
 
-  // In Cloud OR when personal mode is enabled, look up a non-dedicated platform for this identity
-  if (edition === ApEdition.CLOUD || personalMode) {
-    const platforms = await platformService.listPlatformsForIdentityWithAtleastProject({ identityId })
-    const platform = platforms.find((p) => !platformUtils.isCustomerOnDedicatedDomain(p))
-    return platform?.id ?? null
-  }
-  return null
+    // In Cloud OR when personal mode is enabled, look up a non-dedicated platform for this identity
+    if (edition === ApEdition.CLOUD || personalMode) {
+        const platforms = await platformService.listPlatformsForIdentityWithAtleastProject({ identityId })
+        const platform = platforms.find((p) => !platformUtils.isCustomerOnDedicatedDomain(p))
+        return platform?.id ?? null
+    }
+    return null
 }
 
 
@@ -281,6 +274,7 @@ type FederatedAuthnParams = {
     trackEvents: boolean
     provider: UserIdentityProvider
     predefinedPlatformId: string | null
+    imageUrl?: string
 }
 
 type SignUpParams = {
@@ -292,6 +286,7 @@ type SignUpParams = {
     trackEvents: boolean
     newsLetter: boolean
     provider: UserIdentityProvider
+    imageUrl?: string
 }
 
 type SignInWithPasswordParams = {

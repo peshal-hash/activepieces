@@ -1,4 +1,6 @@
 import {
+    BranchExecutionType,
+    BranchOperator,
     FlowAction,
     FlowActionType,
     FlowOperationRequest,
@@ -8,9 +10,8 @@ import {
     FlowTriggerType,
     FlowVersion,
     FlowVersionState,
-    PackageType,
-    PieceType,
     PropertyExecutionType,
+    RouterExecutionType,
     StepLocationRelativeToParent,
 } from '../../src'
 import { _getImportOperations } from '../../src/lib/flows/operations/import-flow'
@@ -23,6 +24,7 @@ const flowVersionWithBranching: FlowVersion = {
     updatedBy: '',
     displayName: 'Standup Reminder',
     agentIds: [],
+    notes: [],
     trigger: {
         name: 'trigger',
         type: FlowTriggerType.PIECE,
@@ -42,30 +44,35 @@ const flowVersionWithBranching: FlowVersion = {
         },
         nextAction: {
             name: 'step_1',
-            type: 'ROUTER',
+            type: FlowActionType.ROUTER,
             valid: true,
             settings: {
-                conditions: [
-                    [
-                        {
-                            operator: 'TEXT_CONTAINS',
-                            firstValue: '1',
-                            secondValue: '1',
-                            caseSensitive: true,
-                        },
-                    ],
+                branches: [
+                    {
+                        conditions: [
+                            [
+                                {
+                                    operator: BranchOperator.TEXT_CONTAINS,
+                                    firstValue: '1',
+                                    secondValue: '1',
+                                    caseSensitive: true,
+                                },
+                            ],
+                        ],
+                        branchType: BranchExecutionType.CONDITION,
+                        branchName: 'step_4',
+                    },
                 ],
+                executionType: RouterExecutionType.EXECUTE_ALL_MATCH,
             },
             nextAction: {
                 name: 'step_4',
-                type: 'PIECE',
+                type: FlowActionType.PIECE,
                 valid: true,
                 settings: {
                     input: {
                         key: '1',
                     },
-                    packageType: PackageType.REGISTRY,
-                    pieceType: PieceType.OFFICIAL,
                     pieceName: 'store',
                     pieceVersion: '~0.2.6',
                     actionName: 'get',
@@ -78,44 +85,44 @@ const flowVersionWithBranching: FlowVersion = {
                 displayName: 'Get',
             },
             displayName: 'Router',
-            onFailureAction: {
-                name: 'step_3',
-                type: 'CODE',
-                valid: true,
-                settings: {
-                    input: {},
-                    sourceCode: {
-                        code: 'test',
-                        packageJson: '{}',
-                    },
-                },
-                displayName: 'Code',
-            },
-            onSuccessAction: {
-                name: 'step_2',
-                type: 'PIECE',
-                valid: true,
-                settings: {
-                    input: {
-                        content: 'MESSAGE',
-                        webhook_url: 'WEBHOOK_URL',
-                    },
-                    packageType: PackageType.REGISTRY,
-                    pieceType: PieceType.OFFICIAL,
-                    pieceName: 'discord',
-                    pieceVersion: '0.2.1',
-                    actionName: 'send_message_webhook',
-                    propertySettings: {
-                        'content': {
-                            type: PropertyExecutionType.MANUAL,
-                        },
-                        'webhook_url': {
-                            type: PropertyExecutionType.MANUAL,
+            children: [
+                {
+                    name: 'step_3',
+                    type: FlowActionType.CODE,
+                    valid: true,
+                    settings: {
+                        input: {},
+                        sourceCode: {
+                            code: 'test',
+                            packageJson: '{}',
                         },
                     },
+                    displayName: 'Code',
                 },
-                displayName: 'Send Message Webhook',
-            },
+                {
+                    name: 'step_2',
+                    type: FlowActionType.PIECE,
+                    valid: true,
+                    settings: {
+                        input: {
+                            content: 'MESSAGE',
+                            webhook_url: 'WEBHOOK_URL',
+                        },
+                        pieceName: 'discord',
+                        pieceVersion: '0.2.1',
+                        actionName: 'send_message_webhook',
+                        propertySettings: {
+                            'content': {
+                                type: PropertyExecutionType.MANUAL,
+                            },
+                            'webhook_url': {
+                                type: PropertyExecutionType.MANUAL,
+                            },
+                        },
+                    },
+                    displayName: 'Send Message Webhook',
+                },
+            ],
         },
         displayName: 'Cron Expression',
     },
@@ -140,6 +147,7 @@ function createCodeAction(name: string): FlowAction {
     }
 }
 const emptyScheduleFlowVersion: FlowVersion = {
+    notes: [],
     id: 'pj0KQ7Aypoa9OQGHzmKDl',
     created: '2023-05-24T00:16:41.353Z',
     updated: '2023-05-24T00:16:41.353Z',
@@ -187,11 +195,12 @@ describe('Flow Helper', () => {
         const operation: FlowOperationRequest = {
             type: FlowOperationType.DELETE_ACTION,
             request: {
-                names: [flowVersionWithBranching.trigger.nextAction.name],
+                names: [flowVersionWithBranching.trigger.nextAction!.name],
             },
         }
         const result = flowOperations.apply(flowVersionWithBranching, operation)
         const expectedFlowVersion: FlowVersion = {
+            notes: [],
             id: 'pj0KQ7Aypoa9OQGHzmKDl',
             updatedBy: '',
             created: '2023-05-24T00:16:41.353Z',
@@ -219,14 +228,12 @@ describe('Flow Helper', () => {
                 displayName: 'Cron Expression',
                 nextAction: {
                     name: 'step_4',
-                    type: 'PIECE',
+                    type: FlowActionType.PIECE,
                     valid: true,
                     settings: {
                         input: {
                             key: '1',
                         },
-                        packageType: PackageType.REGISTRY,
-                        pieceType: PieceType.OFFICIAL,
                         pieceName: 'store',
                         pieceVersion: '~0.2.6',
                         actionName: 'get',
@@ -344,6 +351,7 @@ describe('Flow Helper', () => {
 
 test('Duplicate Flow With Loops using Import', () => {
     const flowVersion: FlowVersion = {
+        notes: [],
         id: '2XuLcKZWSgKkiHh6RqWXg',
         created: '2023-05-23T00:14:47.809Z',
         updated: '2023-05-23T00:14:47.809Z',
@@ -398,7 +406,7 @@ test('Duplicate Flow With Loops using Import', () => {
                 displayName: 'Loop on Items',
                 firstLoopAction: {
                     name: 'step_2',
-                    type: 'CODE',
+                    type: FlowActionType.CODE,
                     valid: true,
                     settings: {
                         input: {},

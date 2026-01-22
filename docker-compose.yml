@@ -1,4 +1,3 @@
-version: '3.0'
 services:
   activepieces:
     build:
@@ -8,7 +7,7 @@ services:
     image: activepieces:1.0.0
     container_name: activepieces
     restart: unless-stopped
-    ## Enable the following line if you already use AP_EXECUTION_MODE with SANDBOXED or old activepieces, checking the breaking change documentation for more info.
+    ## Enable the following line if you already use AP_EXECUTION_MODE with SANDBOX_PROCESS or old activepieces, checking the breaking change documentation for more info.
     ## privileged: true
     ports:
       - '5000:5000'  # Exposes your Python proxy application

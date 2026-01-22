@@ -99,7 +99,7 @@ export const projectReleaseService = {
 }
 async function findDiffStates(projectId: ProjectId, ownerId: ApId, params: DiffReleaseRequest | CreateProjectReleaseRequestBody, log: FastifyBaseLogger): Promise<DiffState> {
     const newState = await getStateFromCreateRequest(projectId, ownerId, params, log) as ProjectState
-    const currentState = await projectStateService(log).getCurrentState(projectId, log) as ProjectState
+    const currentState = await projectStateService(log).getProjectState(projectId, log) as ProjectState
     const diffs = await projectDiffService.diff({
         newState,
         currentState,
@@ -109,7 +109,7 @@ async function findDiffStates(projectId: ProjectId, ownerId: ApId, params: DiffR
 
 async function toResponse(params: toResponseParams): Promise<ProjectSyncPlan> {
     const { diffs, errors } = params
-    const { flows, connections, tables, agents } = diffs
+    const { flows, connections, tables } = diffs
     const responsePlans: FlowProjectOperation[] = flows.map((operation) => {
         switch (operation.type) {
             case FlowProjectOperationType.DELETE_FLOW:
@@ -147,7 +147,6 @@ async function toResponse(params: toResponseParams): Promise<ProjectSyncPlan> {
         flows: responsePlans,
         connections,
         tables,
-        agents,
     }
 }
 async function getStateFromCreateRequest(projectId: string, ownerId: ApId, request: DiffReleaseRequest | CreateProjectReleaseRequestBody, log: FastifyBaseLogger): Promise<ProjectState> {
@@ -157,7 +156,7 @@ async function getStateFromCreateRequest(projectId: string, ownerId: ApId, reque
             return gitRepoService(log).getState({ gitRepo, userId: ownerId, log })
         }
         case ProjectReleaseType.PROJECT: {
-            return projectStateService(log).getCurrentState(request.targetProjectId, log)
+            return projectStateService(log).getProjectState(request.targetProjectId, log)
         }
         case ProjectReleaseType.ROLLBACK: {
             const projectRelease = await projectReleaseService.getOneOrThrow({

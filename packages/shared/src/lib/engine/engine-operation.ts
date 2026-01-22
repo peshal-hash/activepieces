@@ -1,4 +1,5 @@
 import { Static, Type } from '@sinclair/typebox'
+import { ExecutionToolStatus, PredefinedInputsStructure } from '../agents'
 import { AppConnectionValue } from '../app-connection/app-connection'
 import { ExecutionState, ExecutionType, ResumePayload } from '../flow-run/execution/execution-output'
 import { FlowRunId, RunEnvironment } from '../flow-run/flow-run'
@@ -10,7 +11,6 @@ import { ScheduleOptions } from '../trigger'
 
 export enum EngineOperationType {
     EXTRACT_PIECE_METADATA = 'EXTRACT_PIECE_METADATA',
-    EXECUTE_TOOL = 'EXECUTE_TOOL',
     EXECUTE_FLOW = 'EXECUTE_FLOW',
     EXECUTE_PROPERTY = 'EXECUTE_PROPERTY',
     EXECUTE_TRIGGER_HOOK = 'EXECUTE_TRIGGER_HOOK',
@@ -31,25 +31,19 @@ export type EngineOperation =
     | ExecuteFlowOperation
     | ExecutePropsOptions
     | ExecuteTriggerOperation<TriggerHookType>
-    | ExecuteExtractPieceMetadata
+    | ExecuteExtractPieceMetadataOperation
     | ExecuteValidateAuthOperation
 
 export const enum EngineSocketEvent {
-    ENGINE_RESULT = 'engine-result',
-    ENGINE_ERROR = 'engine-error',
+    ENGINE_RESPONSE = 'engine-response',
     ENGINE_STDOUT = 'engine-stdout',
     ENGINE_STDERR = 'engine-stderr',
-    ENGINE_READY = 'engine-ready',
     ENGINE_OPERATION = 'engine-operation',
+    UPDATE_RUN_PROGRESS = 'update-run-progress',
+    SEND_FLOW_RESPONSE = 'send-flow-response',
+    UPDATE_STEP_PROGRESS = 'update-step-progress',
 }
 
-export const EngineResult = Type.Object({
-    result: Type.Unknown(),
-})
-
-export const EngineError = Type.Object({
-    error: Type.Unknown(),
-})
 
 export const EngineStdout = Type.Object({
     message: Type.String(),
@@ -60,8 +54,6 @@ export const EngineStderr = Type.Object({
 })
 
 
-export type EngineResult = Static<typeof EngineResult>
-export type EngineError = Static<typeof EngineError>
 export type EngineStdout = Static<typeof EngineStdout>
 export type EngineStderr = Static<typeof EngineStderr>
 
@@ -71,21 +63,25 @@ export type BaseEngineOperation = {
     engineToken: string
     internalApiUrl: string
     publicApiUrl: string
+    timeoutInSeconds: number
+    platformId: PlatformId
 }
 
 export type ExecuteValidateAuthOperation = Omit<BaseEngineOperation, 'projectId'> & {
     piece: PiecePackage
-    platformId: PlatformId
     auth: AppConnectionValue
 }
 
 export type ExecuteExtractPieceMetadata = PiecePackage & { platformId: PlatformId }
 
+export type ExecuteExtractPieceMetadataOperation = ExecuteExtractPieceMetadata & { timeoutInSeconds: number, platformId: PlatformId }
+
 export type ExecuteToolOperation = BaseEngineOperation & {
     actionName: string
     pieceName: string
     pieceVersion: string
-    input: Record<string, unknown>
+    predefinedInput?: PredefinedInputsStructure
+    instruction: string
 }
 
 export type ExecutePropsOptions = BaseEngineOperation & {
@@ -102,7 +98,6 @@ type BaseExecuteFlowOperation<T extends ExecutionType> = BaseEngineOperation & {
     flowVersion: FlowVersion
     flowRunId: FlowRunId
     executionType: T
-    tasks: number
     runEnvironment: RunEnvironment
     executionState: ExecutionState
     serverHandlerId: string | null
@@ -110,7 +105,8 @@ type BaseExecuteFlowOperation<T extends ExecutionType> = BaseEngineOperation & {
     progressUpdateType: ProgressUpdateType
     stepNameToTest: string | null
     sampleData?: Record<string, unknown>
-
+    logsUploadUrl?: string
+    logsFileId?: string
 }
 
 export enum ProgressUpdateType {
@@ -215,6 +211,13 @@ export type ExecuteTriggerResponse<H extends TriggerHookType> = H extends Trigge
                 H extends TriggerHookType.ON_DISABLE ? Record<string, never> :
                     ExecuteOnEnableTriggerResponse
 
+export type ExecuteToolResponse = {
+    status: ExecutionToolStatus
+    output?: unknown
+    resolvedInput: Record<string, unknown>
+    errorMessage?: unknown
+}
+
 export type ExecuteActionResponse = {
     success: boolean
     input: unknown
@@ -236,14 +239,16 @@ export type ExecuteValidateAuthResponse =
     | InvalidExecuteValidateAuthResponseOutput
 
 
-export type EngineResponse<T> = {
+export type EngineResponse<T = unknown> = {
     status: EngineResponseStatus
     response: T
+    delayInSeconds?: number
+    error?: string
 }
 
 export enum EngineResponseStatus {
     OK = 'OK',
-    ERROR = 'ERROR',
+    INTERNAL_ERROR = 'INTERNAL_ERROR',
     TIMEOUT = 'TIMEOUT',
     MEMORY_ISSUE = 'MEMORY_ISSUE',
 }

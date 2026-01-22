@@ -1,5 +1,4 @@
 {
-  "Fillout Forms": "Fillout Forms",
   "Create interactive forms and automate workflows with Fillout": "Create interactive forms and automate workflows with Fillout",
   "To get your API key:\n1. Go to your Fillout account settings.\n2. Click on \"Developer settings\".\n3. Generate and copy your API key.\n4. Paste it here.": "To get your API key:\n1. Go to your Fillout account settings.\n2. Click on \"Developer settings\".\n3. Generate and copy your API key.\n4. Paste it here.",
   "Get Form Responses": "Get Form Responses",
@@ -25,6 +24,7 @@
   "Method": "Method",
   "Headers": "Headers",
   "Query Parameters": "Query Parameters",
+  "Body Type": "Body Type",
   "Body": "Body",
   "Response is Binary ?": "Response is Binary ?",
   "No Error on Failure": "No Error on Failure",
@@ -41,7 +41,7 @@
   "Select from the 50 most recent submissions for the chosen form.": "Select from the 50 most recent submissions for the chosen form.",
   "The (partial or full) title of the form to search for.": "The (partial or full) title of the form to search for.",
   "Authorization headers are injected automatically from your connection.": "Authorization headers are injected automatically from your connection.",
-  "Enable for files like PDFs, images, etc..": "Enable for files like PDFs, images, etc..",
+  "Enable for files like PDFs, images, etc.": "Enable for files like PDFs, images, etc.",
   "In Progress (unfinished)": "In Progress (unfinished)",
   "Ascending": "Ascending",
   "Descending": "Descending",
@@ -51,6 +51,10 @@
   "PUT": "PUT",
   "DELETE": "DELETE",
   "HEAD": "HEAD",
+  "None": "None",
+  "JSON": "JSON",
+  "Form Data": "Form Data",
+  "Raw": "Raw",
   "New Form Response": "New Form Response",
   "Triggers when a new submission is received for a selected Fillout form.": "Triggers when a new submission is received for a selected Fillout form."
 }

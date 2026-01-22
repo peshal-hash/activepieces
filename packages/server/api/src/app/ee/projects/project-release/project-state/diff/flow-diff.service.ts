@@ -1,4 +1,5 @@
-import { assertNotNullOrUndefined, DEFAULT_SAMPLE_DATA_SETTINGS, FlowActionType, flowPieceUtil, FlowProjectOperationType, flowStructureUtil, FlowTriggerType, FlowVersion, isNil, PopulatedFlow, ProjectOperation, ProjectState, Step } from '@activepieces/shared'
+import { assertNotNullOrUndefined, DEFAULT_SAMPLE_DATA_SETTINGS, FlowActionType, flowPieceUtil, FlowProjectOperationType, FlowState, flowStructureUtil, FlowTriggerType, FlowVersion, isNil, mapsAreSame, ProjectOperation, ProjectState, Step } from '@activepieces/shared'
+import deepEqual from 'deep-equal'
 import semver from 'semver'
 
 export const flowDiffService = {
@@ -35,7 +36,7 @@ async function findFlowsToUpdate({ newState, currentState }: DiffParams): Promis
         const flow = searchInFlowForFlowByIdOrExternalId(currentState.flows, state.externalId)
         return !isNil(flow)
     })
-    
+
     const operations = await Promise.all(newStateFiles.map(async (flowFromNewState) => {
         const os = searchInFlowForFlowByIdOrExternalId(currentState.flows, flowFromNewState.externalId)
         assertNotNullOrUndefined(os, `Could not find target flow for source flow ${flowFromNewState.externalId}`)
@@ -53,7 +54,7 @@ async function findFlowsToUpdate({ newState, currentState }: DiffParams): Promis
     return operations.filter((op): op is ProjectOperation => op !== null)
 }
 
-function searchInFlowForFlowByIdOrExternalId(flows: PopulatedFlow[], externalId: string): PopulatedFlow | undefined {
+function searchInFlowForFlowByIdOrExternalId(flows: FlowState[], externalId: string): FlowState | undefined {
     return flows.find((flow) => flow.externalId === externalId)
 }
 
@@ -77,35 +78,44 @@ function isSameVersion(versionOne: string, versionTwo: string): boolean {
     }
 }
 
-async function isFlowChanged(fromFlow: PopulatedFlow, targetFlow: PopulatedFlow): Promise<boolean> {
-    const normalizedFromFlow = await normalize(fromFlow.version)
-    const normalizedTargetFlow = await normalize(targetFlow.version)
-
-    const versionSetOne = new Map<string, string>()
-    const versionSetTwo = new Map<string, string>()
-
-    flowStructureUtil.getAllSteps(normalizedFromFlow.trigger).forEach((step) => {
+async function isFlowChanged(fromFlow: FlowState, targetFlow: FlowState): Promise<boolean> {
+    const stepsPieceVersionsFrom = new Map<string, string>()
+    const stepsPiecesVersionTo = new Map<string, string>()
+    const notesFrom = new Map<string, string>()
+    const notesTo = new Map<string, string>()
+    
+    flowStructureUtil.getAllSteps(fromFlow.version.trigger).forEach((step) => {
         if ([FlowActionType.PIECE, FlowTriggerType.PIECE].includes(step.type)) {
-            versionSetOne.set(step.name, step.settings.pieceVersion)
+            stepsPieceVersionsFrom.set(step.name, step.settings.pieceVersion)
         }
     })
 
-    flowStructureUtil.getAllSteps(normalizedTargetFlow.trigger).forEach((step) => {
+    flowStructureUtil.getAllSteps(targetFlow.version.trigger).forEach((step) => {
         if ([FlowActionType.PIECE, FlowTriggerType.PIECE].includes(step.type)) {
-            versionSetTwo.set(step.name, step.settings.pieceVersion)
+            stepsPiecesVersionTo.set(step.name, step.settings.pieceVersion)
         }
     })
 
-    const isMatched = Array.from(versionSetOne.entries()).every(([key, value]) => {
-        const versionTwo = versionSetTwo.get(key)
+    fromFlow.version.notes.forEach((note) => {
+        notesFrom.set(note.id, note.content)
+    })
+    targetFlow.version.notes.forEach((note) => {
+        notesTo.set(note.id, note.content)
+    })
+    const notesMatched = mapsAreSame(notesFrom, notesTo)
+
+    const isMatched = Array.from(stepsPieceVersionsFrom.entries()).every(([key, value]) => {
+        const versionTwo = stepsPiecesVersionTo.get(key)
         if (isNil(versionTwo) || isNil(value)) {
             return false
         }
         return isSameVersion(versionTwo, value)
     })
 
+    const normalizedFromFlow = await normalize(fromFlow.version)
+    const normalizedTargetFlow = await normalize(targetFlow.version)
     return normalizedFromFlow.displayName !== normalizedTargetFlow.displayName
-        || JSON.stringify(normalizedFromFlow.trigger) !== JSON.stringify(normalizedTargetFlow.trigger) || !isMatched
+        || !deepEqual(normalizedFromFlow.trigger, normalizedTargetFlow.trigger) || !isMatched || !notesMatched
 }
 
 async function normalize(flowVersion: FlowVersion): Promise<FlowVersion> {

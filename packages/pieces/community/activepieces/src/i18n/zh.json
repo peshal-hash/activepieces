@@ -1,5 +1,4 @@
 {
-  "Activepieces Platform": "Activepieces Platform",
   "Open source no-code business automation": "Open source no-code business automation",
   "Base URL": "基本网址",
   "API Key": "API 密钥",
@@ -15,7 +14,6 @@
   "Display Name": "显示名称",
   "Id": "Id",
   "Notify Status": "Notify Status",
-  "Tasks": "任务",
   "Team Members": "Team Members",
   "Method": "方法",
   "Headers": "信头",

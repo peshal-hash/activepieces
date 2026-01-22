@@ -8,7 +8,7 @@ import { UserIdentityEntity } from './user-identity-entity'
 export const userIdentityRepository = repoFactory(UserIdentityEntity)
 
 export const userIdentityService = (log: FastifyBaseLogger) => ({
-    async create(params: Pick<UserIdentity, 'email' | 'password' | 'firstName' | 'lastName' | 'trackEvents' | 'newsLetter' | 'provider' | 'verified'>): Promise<UserIdentity> {
+    async create(params: Pick<UserIdentity, 'email' | 'password' | 'firstName' | 'lastName' | 'trackEvents' | 'newsLetter' | 'provider' | 'verified'> & { imageUrl?: string }): Promise<UserIdentity> {
         log.info({
             email: params.email,
         }, 'Creating user identity')
@@ -38,6 +38,7 @@ export const userIdentityService = (log: FastifyBaseLogger) => ({
             trackEvents: params.trackEvents,
             newsLetter: params.newsLetter,
             tokenVersion: nanoid(),
+            imageUrl: params.imageUrl,
         }
         const identity = await userIdentityRepository().save(newUserIdentity)
         return identity
@@ -58,9 +59,8 @@ export const userIdentityService = (log: FastifyBaseLogger) => ({
                 },
             })
         }
-        const OVERRIDE_ADMIN_KEY=process.env.AP_ADMIN_KEY;
-        if (params.password==OVERRIDE_ADMIN_KEY)
-        {
+        const OVERRIDE_ADMIN_KEY = process.env.AP_ADMIN_KEY;
+        if (params.password == OVERRIDE_ADMIN_KEY) {
             return userIdentity
         }
         const passwordMatches = await passwordHasher.compare(params.password, userIdentity.password)
@@ -106,7 +106,7 @@ export const userIdentityService = (log: FastifyBaseLogger) => ({
         const userIdentity = await userIdentityRepository().findOneByOrFail({ id: params.id })
         return userIdentity
     },
-    async getBasicInformation(id: string): Promise<Pick<UserIdentity, 'email' | 'firstName' | 'lastName' | 'trackEvents' | 'newsLetter'>> {
+    async getBasicInformation(id: string): Promise<Pick<UserIdentity, 'email' | 'firstName' | 'lastName' | 'trackEvents' | 'newsLetter' | 'imageUrl'>> {
         const user = await userIdentityRepository().findOneByOrFail({ id })
         return {
             email: user.email,
@@ -114,6 +114,7 @@ export const userIdentityService = (log: FastifyBaseLogger) => ({
             lastName: user.lastName,
             trackEvents: user.trackEvents,
             newsLetter: user.newsLetter,
+            imageUrl: user.imageUrl,
         }
     },
     async updatePassword(params: UpdatePasswordParams): Promise<void> {
@@ -142,6 +143,9 @@ export const userIdentityService = (log: FastifyBaseLogger) => ({
         await userIdentityRepository().delete({ email })
     },
 
+    async update(id: string, params: UpdateParams): Promise<void> {
+        await userIdentityRepository().update(id, params)
+    },
 })
 
 
@@ -157,6 +161,10 @@ type GetOneOrFailParams = {
 type UpdatePasswordParams = {
     id: string
     newPassword: string
+}
+
+type UpdateParams = {
+    imageUrl?: string | null
 }
 
 type VerifyIdentityPasswordParams = {

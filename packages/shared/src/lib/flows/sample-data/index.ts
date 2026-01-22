@@ -6,10 +6,18 @@ export enum SampleDataFileType {
     OUTPUT = 'OUTPUT',
 }
 
+export const DATA_TYPE_KEY_IN_FILE_METADATA = 'dataType'
+
+
+export enum SampleDataDataType {
+    JSON = 'JSON',
+    STRING = 'STRING',
+}
 export const SaveSampleDataRequest = Type.Object({
     stepName: Type.String(),
     payload: Type.Unknown(),
     type: Type.Enum(SampleDataFileType),
+    dataType: Type.Enum(SampleDataDataType),
 })
 export type SaveSampleDataRequest = Static<typeof SaveSampleDataRequest>
 
@@ -23,6 +31,7 @@ export const GetSampleDataRequest = Type.Object({
 export type GetSampleDataRequest = Static<typeof GetSampleDataRequest>
 
 export const CreateStepRunRequestBody = Type.Object({
+    projectId: Type.String(),
     flowVersionId: Type.String(),
     stepName: Type.String(),
 })

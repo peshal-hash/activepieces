@@ -1,5 +1,4 @@
 {
-  "Pastefy": "Pastefy",
   "Sharing code snippets platform": "Sharing code snippets platform",
   "Pastefy Instance URL": "Pastefy Instance URL",
   "API-Token": "API-Token",
@@ -35,6 +34,7 @@
   "Method": "Method",
   "Headers": "Headers",
   "Query Parameters": "Query Parameters",
+  "Body Type": "Body Type",
   "Body": "Body",
   "Response is Binary ?": "Response is Binary ?",
   "No Error on Failure": "No Error on Failure",
@@ -43,7 +43,7 @@
   "A folder": "A folder",
   "Decrypts the paste with this password": "Decrypts the paste with this password",
   "Authorization headers are injected automatically from your connection.": "Authorization headers are injected automatically from your connection.",
-  "Enable for files like PDFs, images, etc..": "Enable for files like PDFs, images, etc..",
+  "Enable for files like PDFs, images, etc.": "Enable for files like PDFs, images, etc.",
   "Public": "Public",
   "Unlisted": "Unlisted",
   "Private": "Private",
@@ -53,6 +53,10 @@
   "PUT": "PUT",
   "DELETE": "DELETE",
   "HEAD": "HEAD",
+  "None": "None",
+  "JSON": "JSON",
+  "Form Data": "Form Data",
+  "Raw": "Raw",
   "Paste Changed": "Paste Changed",
   "Triggers when the content (or title) of the paste changes": "Triggers when the content (or title) of the paste changes",
   "Include Title": "Include Title"

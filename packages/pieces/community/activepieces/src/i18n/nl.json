@@ -1,5 +1,4 @@
 {
-  "Activepieces Platform": "Activepieces Platform",
   "Open source no-code business automation": "Open source zakelijke automatisering zonder code",
   "Base URL": "Basis URL",
   "API Key": "API Sleutel",
@@ -15,7 +14,6 @@
   "Display Name": "Weergavenaam",
   "Id": "Id",
   "Notify Status": "Notificatie status",
-  "Tasks": "Taken",
   "Team Members": "Team leden",
   "Method": "Methode",
   "Headers": "Kopteksten",
