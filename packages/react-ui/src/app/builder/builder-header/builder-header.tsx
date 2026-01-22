@@ -206,7 +206,7 @@ export const BuilderHeader = () => {
   return (
     <div
       style={{
-        height: `$${flowCanvasConsts.BUILDER_HEADER_HEIGHT}px`,
+        height: `${flowCanvasConsts.BUILDER_HEADER_HEIGHT}px`,
       }}
     >
       <PageHeader
@@ -218,6 +218,5 @@ export const BuilderHeader = () => {
         hideSidebarTrigger={embedState.isEmbedded}
       />
     </div>
-    </div >
   );
 };
