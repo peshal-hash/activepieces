@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import { t } from 'i18next';
-import { ClipboardCheck, Sparkles, Clock, Rocket } from 'lucide-react';
+import { Sparkles, Clock, Rocket, Workflow } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';
 
@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useManagePlanDialogStore } from '@/features/billing/components/upgrade-dialog/store';
 import { flagsHooks } from '@/hooks/flags-hooks';
 import { platformHooks } from '@/hooks/platform-hooks';
-import { projectHooks } from '@/hooks/project-hooks';
 import { cn, formatUtils } from '@/lib/utils';
 import { ApSubscriptionStatus } from '@activepieces/ee-shared';
 import { ApEdition, ApFlagId, isNil } from '@activepieces/shared';
@@ -63,9 +62,11 @@ const getTrialProgress = (trialStartDate: number, trialEndDate: number) => {
 const UsageLimitsButton = React.memo(() => {
   const openDialog = useManagePlanDialogStore((state) => state.openDialog);
 
-  const { project, isPending } = projectHooks.useCurrentProject();
-
   const { platform } = platformHooks.useCurrentPlatform();
+  const platformUsage = platform.usage;
+  const aiCreditsUsed = platformUsage
+    ? Math.max(0, platformUsage.aiCreditsLimit - platformUsage.aiCreditsRemaining)
+    : 0;
 
   const { data: edition } = flagsHooks.useFlag<ApEdition>(ApFlagId.EDITION);
 
@@ -76,7 +77,7 @@ const UsageLimitsButton = React.memo(() => {
     return null;
   }
 
-  if (isPending || isNil(project)) {
+  if (isNil(platformUsage)) {
     return (
       <div className="flex flex-col gap-2 w-full px-2">
         <Separator className="my-1.5" />
@@ -119,15 +120,15 @@ const UsageLimitsButton = React.memo(() => {
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-4">
           <UsageProgress
-            name={t('Tasks')}
-            value={project.usage.tasks}
-            max={project.plan.tasks}
-            icon={<ClipboardCheck className="w-4 h-4 mr-1" />}
+            name={t('Active Flows')}
+            value={platformUsage.activeFlows}
+            max={platform.plan.activeFlowsLimit}
+            icon={<Workflow className="w-4 h-4 mr-1" />}
           />
           <UsageProgress
             name={t('AI Credits')}
-            value={Math.round(project.usage.aiCredits)}
-            max={project.plan.aiCredits}
+            value={Math.round(aiCreditsUsed)}
+            max={platformUsage.aiCreditsLimit}
             icon={<Sparkles className="w-4 h-4  mr-1" />}
           />
           {isTrial &&
@@ -159,11 +160,7 @@ const UsageLimitsButton = React.memo(() => {
           </div>
         )}
         {!isTrial && (
-          <div className="text-xs text-muted-foreground flex justify-between w-full">
-            <span>
-              {t('Usage resets in')}{' '}
-              {getTimeUntilNextReset(project.usage.nextLimitResetDate)}{' '}
-            </span>
+          <div className="text-xs text-muted-foreground flex justify-end w-full">
             <FlagGuard flag={ApFlagId.SHOW_BILLING_PAGE}>
               <Link to={'/setup/billing'} className="w-fit">
                 <span className="text-xs text-primary underline">
