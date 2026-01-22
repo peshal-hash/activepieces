@@ -39,7 +39,7 @@ jobs:
       - name: Azure Login
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+          creds: ${{ secrets.AZURE_STAGING_CREDENTIALS }}
 
       # The rest of your deploy job steps remain the same...
       - name: Set Correct Subscription Context
@@ -81,7 +81,7 @@ jobs:
       - name: Azure Login
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS_PROD }}
+          creds: ${{ secrets.AZURE_STAGING_CREDENTIALS }}
 
       - name: Check and cleanup failed deployments
         run: |
