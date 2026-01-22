@@ -28,6 +28,8 @@ export type PlatformUsage = Static<typeof PlatformUsage>
 export enum PlanName {
     STANDARD = 'standard',
     ENTERPRISE = 'enterprise',
+    PLUS = 'plus',
+    BUSINESS = 'business',
     APPSUMO_ACTIVEPIECES_TIER1 = 'appsumo_activepieces_tier1',
     APPSUMO_ACTIVEPIECES_TIER2 = 'appsumo_activepieces_tier2',
     APPSUMO_ACTIVEPIECES_TIER3 = 'appsumo_activepieces_tier3',

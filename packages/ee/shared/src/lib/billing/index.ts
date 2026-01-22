@@ -12,9 +12,19 @@ export type ProjectPlanLimits = {
     piecesFilterType?: PiecesFilterType
 }
 
+export enum BillingCycle {
+    MONTHLY = 'monthly',
+    ANNUAL = 'annual',
+}
+
 export enum ApSubscriptionStatus {
     ACTIVE = 'active',
     CANCELED = 'canceled',
+    TRIALING = 'trialing',
+    PAST_DUE = 'past_due',
+    UNPAID = 'unpaid',
+    INCOMPLETE = 'incomplete',
+    INCOMPLETE_EXPIRED = 'incomplete_expired',
 }
 
 export const METRIC_TO_LIMIT_MAPPING = {
