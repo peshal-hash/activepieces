@@ -14,6 +14,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends \
     openssh-client \
     python3 \
+    python3-pip \
     g++ \
     build-essential \
     git \
