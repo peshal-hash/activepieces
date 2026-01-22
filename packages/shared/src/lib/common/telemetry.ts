@@ -146,6 +146,11 @@ type PieceSelectorSearch = {
     isTrigger: boolean
     selectedActionOrTriggerName: string | null
 }
+
+export type ClickedTutorialTelemetryParams = {
+    tab: 'gettingStarted' | 'flows' | 'agents' | 'tables' | 'mcpServers' | 'todos'
+    location: string
+}
 export enum TelemetryEventName {
     SIGNED_UP = 'signed.up',
     QUOTA_ALERT = 'quota.alert',
@@ -182,6 +187,7 @@ export enum TelemetryEventName {
     UPGRADE_CLICKED = 'upgrade.clicked',
     OPENED_PRICING_FROM_DASHBOARD = 'opened.pricing.from.dashboard',
     PIECE_SELECTOR_SEARCH = 'piece.selector.search',
+    CLICKED_TUTORIAL = 'tutorial.clicked',
 }
 
 type BaseTelemetryEvent<T, P> = {
@@ -251,3 +257,4 @@ export type TelemetryEvent =
   >
   | BaseTelemetryEvent<TelemetryEventName.MCP_TOOL_CALLED, McpToolCalled>
   | BaseTelemetryEvent<TelemetryEventName.PIECE_SELECTOR_SEARCH, PieceSelectorSearch>
+  | BaseTelemetryEvent<TelemetryEventName.CLICKED_TUTORIAL, ClickedTutorialTelemetryParams>

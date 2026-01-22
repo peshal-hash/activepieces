@@ -20,6 +20,7 @@ type EmbeddingState = {
   homeButtonIcon: 'back' | 'logo';
   hideDuplicateFlow: boolean;
   hidePageHeader: boolean;
+  hideProjectSettings: boolean;
 };
 
 const defaultState: EmbeddingState = {
@@ -36,6 +37,7 @@ const defaultState: EmbeddingState = {
   homeButtonIcon: 'logo',
   hideDuplicateFlow: false,
   hidePageHeader: false,
+  hideProjectSettings: false,
 };
 
 const EmbeddingContext = createContext<{
