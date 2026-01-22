@@ -4,7 +4,6 @@ import {
     ApId,
     ApMultipartFile,
     assertNotNullOrUndefined,
-    EndpointScope,
     FileType,
     isNil,
     PrincipalType,
@@ -97,8 +96,7 @@ const DeleteUserRequest = {
         }),
     },
     config: {
-        allowedPrincipals: [PrincipalType.USER, PrincipalType.SERVICE],
-        scope: EndpointScope.PLATFORM,
+        security: securityAccess.publicPlatform([PrincipalType.USER, PrincipalType.SERVICE]),
     },
 }
 

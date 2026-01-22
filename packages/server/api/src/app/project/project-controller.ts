@@ -60,8 +60,7 @@ const UpdateProjectRequest = {
 // 🔴 NEW: Delete request schema/config
 const DeleteProjectRequest = {
     config: {
-        allowedPrincipals: [PrincipalType.USER, PrincipalType.SERVICE],
-        scope: EndpointScope.PLATFORM,
+        security: securityAccess.publicPlatform([PrincipalType.USER, PrincipalType.SERVICE]),
     },
     schema: {
         tags: ['projects'],

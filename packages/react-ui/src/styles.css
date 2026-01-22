@@ -329,7 +329,7 @@
     --popover: theme('colors.white');
 
     --secondary: theme('colors.black');
-    --secondary-foreground: theme('colors.neutral.white');
+    --secondary-foreground: theme('colors.white');
 
     --muted: theme('colors.neutral.100');
     --muted-foreground: theme('colors.neutral.500');

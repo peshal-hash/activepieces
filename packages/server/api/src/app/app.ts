@@ -10,8 +10,6 @@ import { Socket } from 'socket.io'
 import path from 'path';
 import fastifyStatic from '@fastify/static';
 import fastify from 'fastify';
-import { agentModule } from './agents/agent-module'
-import { agentRunsModule } from './agents/agent-runs/agent-runs-module'
 import { aiProviderService } from './ai/ai-provider-service'
 import { aiProviderModule } from './ai/ai-provider.module'
 import { platformAnalyticsModule } from './analytics/platform-analytics.module'
@@ -216,8 +214,6 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
     await app.register(userModule)
     await app.register(todoModule)
     await app.register(todoActivityModule)
-    await app.register(agentRunsModule)
-    await app.register(solutionsModule)
     await app.register(templateModule)
     await app.register(userBadgeModule)
     await app.register(platformAnalyticsModule)
@@ -339,12 +335,10 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
         case ApEdition.COMMUNITY:
             await app.register(projectModule)
             await app.register(communityPiecesModule)
-            await app.register(communityFlowTemplateModule)
             await app.register(otpModule)
             await app.register(enterpriseLocalAuthnModule)
             await app.register(federatedAuthModule)
 
-            systemJobHandlers.registerJobHandler(SystemJobName.ISSUES_REMINDER, emailService(app.log).sendReminderJobHandler)
             setPlatformOAuthService(platformOAuth2Service(app.log))
             await app.register(queueMetricsModule)
             break

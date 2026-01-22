@@ -6,7 +6,6 @@ import {
     EntitySchema,
     FindOperator,
     ObjectLiteral,
-    Raw,
     SelectQueryBuilder,
 } from 'typeorm'
 import { AIProviderEntity } from '../ai/ai-provider-entity'
@@ -152,15 +151,12 @@ export function AddAPArrayContainsToQueryBuilder<T extends ObjectLiteral>(
     values: string[],
 ): void {
     switch (getDatabaseType()) {
+        case DatabaseType.PGLITE:
         case DatabaseType.POSTGRES:
             queryBuilder.andWhere(`${columnName} @> :values`, { values })
             break
-        case DatabaseType.SQLITE3: {
-            for (const value of values) {
-                queryBuilder.andWhere(`${columnName} LIKE :value${values.indexOf(value)}`, { [`value${values.indexOf(value)}`]: `%${value}%` })
-            }
-            break
-        }
+        default:
+            throw new Error(`Unsupported database type: ${getDatabaseType()}`)
     }
 }
 
@@ -170,22 +166,11 @@ export function APArrayContains<T>(
 ): Record<string, FindOperator<T>> {
     const databaseType = getDatabaseType()
     switch (databaseType) {
+        case DatabaseType.PGLITE:
         case DatabaseType.POSTGRES:
             return {
                 [columnName]: ArrayContains(values),
             }
-        case DatabaseType.SQLITE3: {
-            const likeConditions = values
-                .map((_, index) => `${columnName} LIKE :value${index}`)
-                .join(' AND ')
-            const likeParams = values.reduce((params, value, index) => {
-                params[`value${index}`] = `%${value}%`
-                return params
-            }, {} as Record<string, string>)
-            return {
-                [columnName]: Raw(_ => `(${likeConditions})`, likeParams),
-            }
-        }
         default:
             throw new Error(`Unsupported database type: ${databaseType}`)
     }
@@ -193,4 +178,3 @@ export function APArrayContains<T>(
 
 // Uncomment the below line when running `nx db-migration server-api --name=<MIGRATION_NAME>` and recomment it after the migration is generated
 // export const exportedConnection = databaseConnection()
-
