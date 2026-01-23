@@ -1,5 +1,4 @@
 import { t } from 'i18next';
-import { ChevronsUpDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { useEmbedding } from '@/components/embed-provider';
@@ -84,7 +83,7 @@ export const AppSidebarHeader = () => {
           >
             {state === 'collapsed' ? (
               <Link to={defaultRoute}>
-                <Button variant={'ghost'} size={'icon'}>
+                <Button variant="ghost" size="icon">
                   <img
                     src={branding.logos.logoIconUrl}
                     alt={t('Home')}
@@ -95,7 +94,7 @@ export const AppSidebarHeader = () => {
             ) : (
               <div className="flex items-center gap-2 w-full">
                 <Link to={defaultRoute}>
-                  <Button variant={'ghost'} size={'icon'}>
+                  <Button variant="ghost" size="icon">
                     <img
                       src={branding.logos.logoIconUrl}
                       alt={t('Home')}
@@ -109,7 +108,7 @@ export const AppSidebarHeader = () => {
                     <h1 className="flex-1 min-w-0 truncate font-semibold">
                       {currentPlatform?.name}
                     </h1>
-                    <ChevronsUpDown className="ml-auto shrink-0" />
+                    {/* ✅ removed ChevronsUpDown */}
                   </SidebarMenuButton>
                 </PlatformSwitcher>
               </div>

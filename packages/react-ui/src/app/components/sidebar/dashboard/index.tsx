@@ -182,29 +182,18 @@ export function ProjectDashboardSidebar() {
     isSubItem: false,
   };
 
-  const leaderboardLink: SidebarItemType = {
-    type: 'link',
-    to: '/leaderboard',
-    label: t('Leaderboard'),
-    icon: Trophy,
-    show: true,
-    hasPermission: true,
-    isSubItem: false,
-  };
-
-  const items = [exploreLink, impactLink, leaderboardLink].filter(
+  const items = [exploreLink, impactLink].filter(
     permissionFilter,
   );
 
   return (
     !embedState.hideSideNav && (
-      <Sidebar variant="inset" collapsible="icon" className="group p-1">
-        {/* onClick removed - handled in base Sidebar component to prevent auto-expansion on navigation */}
+        <Sidebar
+          variant="inset"
+          collapsible="icon"
+          className="group p-1 [&_[data-sidebar=trigger]]:hidden [&_[data-sidebar=rail]]:hidden"
+        >
         <AppSidebarHeader />
-
-        {state === 'collapsed' && <div className="mt-1" />}
-        {state === 'expanded' && <div className="mt-2" />}
-
         <SidebarContent
           className={cn(
             state === 'collapsed' ? 'gap-2' : 'gap-0',

@@ -258,14 +258,6 @@ const Sidebar = React.forwardRef<
               state === 'collapsed' && collapsible === 'icon' && 'relative',
             )}
           >
-            {/* Clickable overlay to expand collapsed sidebar */}
-            {state === 'collapsed' && collapsible === 'icon' && (
-              <div
-                className="absolute inset-0 !cursor-nesw-resize z-10"
-                onClick={() => setOpen(true)}
-                aria-hidden="true"
-              />
-            )}
             {children}
           </div>
         </div>
