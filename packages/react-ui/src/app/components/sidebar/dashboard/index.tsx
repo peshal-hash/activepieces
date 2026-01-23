@@ -1,6 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { t } from 'i18next';
-import { Search, Plus, LineChart, Trophy, Compass } from 'lucide-react';
+import { Search, Plus, LineChart, Workflow, Compass } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDebounce } from 'use-debounce';
@@ -191,7 +191,7 @@ export function ProjectDashboardSidebar() {
         <Sidebar
           variant="inset"
           collapsible="icon"
-          className="group p-1 [&_[data-sidebar=trigger]]:hidden [&_[data-sidebar=rail]]:hidden"
+            className="group p-1 cursor-default [&_[data-sidebar=trigger]]:hidden [&_[data-sidebar=rail]]:hidden"
         >
         <AppSidebarHeader />
         <SidebarContent
@@ -213,13 +213,15 @@ export function ProjectDashboardSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-
-          <SidebarSeparator className="mb-3 shrink-0" />
-
           <SidebarGroup className="flex-1 flex flex-col overflow-hidden">
             {state === 'expanded' && (
               <div className="flex items-center justify-between">
-                <SidebarGroupLabel>{t('Projects')}</SidebarGroupLabel>
+              <SidebarGroupLabel>
+                <div className="flex items-center gap-2 cursor-default">
+                  <Workflow className="h-4 w-4" />
+                  {t('Flows')}
+                </div>
+              </SidebarGroupLabel>
                 <div className="flex items-center gap-1">
                   {shouldShowNewProjectButton && (
                     <>
@@ -358,17 +360,6 @@ export function ProjectDashboardSidebar() {
             </div>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter
-          onClick={(e) => e.stopPropagation()}
-          className="cursor-default"
-        >
-          {state === 'expanded' && (
-            <div className="mb-2">
-              <SidebarUsageLimits />
-            </div>
-          )}
-          <SidebarUser />
-        </SidebarFooter>
       </Sidebar>
     )
   );
