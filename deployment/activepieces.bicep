@@ -327,7 +327,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_WEBSITE_NAME'
-              value: 'SalesOptAi'
+              value: 'NexOpta'
             }
             {
               name: 'AP_FILE_STORAGE_LOCATION'

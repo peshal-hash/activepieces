@@ -11,7 +11,7 @@ import customHtmlPlugin from './vite-plugins/html-plugin';
 export default defineConfig(({ command, mode }) => {
   const isDev = command === 'serve' || mode === 'development';
 
-  const AP_TITLE = 'SalesOptAi';
+  const AP_TITLE = 'NextOpta';
 
   // Provide the path to the favicon as a string.
   // The vite-plugin-html will use this path directly.

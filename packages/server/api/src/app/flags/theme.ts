@@ -65,7 +65,7 @@ export function generateTheme({
 
 export const defaultTheme = generateTheme({
     primaryColor: '#1B76C7',
-    websiteName: 'SalesOptAi',
+    websiteName: 'NexOpta',
     fullLogoUrl: "/static/ap-logo.png",
     favIconUrl: "/static/favicon.png",
     logoIconUrl: "/static/favicon.png",
