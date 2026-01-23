@@ -101,27 +101,11 @@ export const ProjectDashboardPageHeader = ({
   const titleContent = (
     <div className="flex items-center gap-2">
       <ApProjectDisplay
-        title={getProjectName(project)}
+        title="Projects"
         maxLengthToNotShowTooltip={30}
         titleClassName="text-base"
         projectType={project.type}
       />
-      {project.type === ProjectType.PERSONAL && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Lock className="w-4 h-4" />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>
-                {t(
-                  'This is your private project. Only you can see and access it.',
-                )}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
     </div>
   );
 
@@ -145,28 +129,6 @@ export const ProjectDashboardPageHeader = ({
           </span>
         </Button>
       )}
-      {showInviteUserButton && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-2"
-          onClick={() => setInviteOpen(true)}
-        >
-          <UserPlus className="w-4 h-4" />
-          <span className="text-sm font-medium">Invite</span>
-        </Button>
-      )}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8"
-        onClick={() => {
-          setSettingsInitialTab(getFirstAvailableTab());
-          setSettingsOpen(true);
-        }}
-      >
-        <Settings className="w-4 h-4" />
-      </Button>
     </div>
   ) : (
     children
