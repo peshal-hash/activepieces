@@ -19,8 +19,19 @@ mv /usr/share/nginx/html/index.html.tmp /usr/share/nginx/html/index.html
 # Start Nginx server in the background
 nginx -g "daemon off;" &
 
-# Start backend server in the background
-node --enable-source-maps dist/packages/server/api/main.js &
+AP_ENTRY="dist/packages/server/api/main.js"
+if [ ! -f "$AP_ENTRY" ] && [ -f "dist/packages/server/api/main.cjs" ]; then
+  AP_ENTRY="dist/packages/server/api/main.cjs"
+fi
+echo "Starting Activepieces backend: $AP_ENTRY"
+node --enable-source-maps "$AP_ENTRY" &
+NODE_PID=$!
+
+sleep 1
+if ! kill -0 "$NODE_PID" 2>/dev/null; then
+  echo "Activepieces backend failed to start (entry: $AP_ENTRY)."
+  exit 1
+fi
 
 
 # --- Start Python Proxy Application ---
