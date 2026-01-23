@@ -12,6 +12,9 @@ param postgresServerName string
 param postgresAdminUser string
 param redisCacheName string
 param deployNewInfrastructure bool
+param smtpHost string = 'smtp.gmail.com'
+param smtpPort int = 587
+param smtpSenderName string = 'NexOpta Msg'
 
 @secure()
 param postgresAdminPassword string
@@ -197,6 +200,16 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           keyVaultUrl: '${keyVault.properties.vaultUri}secrets/AP-ADMIN-KEY'
           identity: managedIdentity.id
         }
+        {
+          name: 'smtp-username'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/SMTP-USERNAME'
+          identity: managedIdentity.id
+        }
+        {
+          name: 'smtp-password'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/SMTP-PASSWORD'
+          identity: managedIdentity.id
+        }
       ]
 
     }
@@ -320,6 +333,26 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'AP_APP_WEBHOOK_SECRETS'
               secretRef: 'ap-app-webhook-secrets'
+            }
+            {
+              name: 'AP_SMTP_HOST'
+              value: smtpHost
+            }
+            {
+              name: 'AP_SMTP_PORT'
+              value: string(smtpPort)
+            }
+            {
+              name: 'AP_SMTP_USERNAME'
+              secretRef: 'smtp-username'
+            }
+            {
+              name: 'AP_SMTP_PASSWORD'
+              secretRef: 'smtp-password'
+            }
+            {
+              name: 'AP_SMTP_SENDER_NAME'
+              value: smtpSenderName
             }
             {
               name: 'AP_SALESOPTAI_URLS'
