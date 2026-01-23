@@ -13,7 +13,7 @@ export class AddOtpEntity1700396157624 implements MigrationInterface {
             return
         }
         await queryRunner.query(`
-            CREATE TABLE "otp" (
+            CREATE TABLE IF NOT EXISTS "otp"  (
                 "id" character varying(21) NOT NULL,
                 "created" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
                 "updated" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),

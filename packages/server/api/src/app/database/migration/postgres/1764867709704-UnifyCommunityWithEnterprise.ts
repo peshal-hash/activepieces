@@ -78,7 +78,7 @@ export class UnifyCommunityWithEnterprise1764867709704 implements MigrationInter
             CREATE UNIQUE INDEX "idx_oauth_app_platformId_pieceName" ON "oauth_app" ("platformId", "pieceName")
         `)
         await queryRunner.query(`
-            CREATE TABLE "otp" (
+            CREATE TABLE IF NOT EXISTS "otp"  (
                 "id" character varying(21) NOT NULL,
                 "created" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
                 "updated" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
