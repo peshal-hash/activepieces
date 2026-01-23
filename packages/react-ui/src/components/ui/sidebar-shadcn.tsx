@@ -81,35 +81,66 @@ const SidebarProvider = React.forwardRef<
     ref,
   ) => {
     const isMobile = useIsMobile();
-    const [openMobile, setOpenMobile] = React.useState(false);
 
-    const [_open, _setOpen] = React.useState(
-      defaultOpen ?? getSidebarStateFromLocalStorage(),
+    // ✅ Force sidebar to always be closed
+    const FORCE_SIDEBAR_CLOSED = true;
+
+    // Mobile sidebar state (kept, but forced closed)
+    const [openMobile, _setOpenMobile] = React.useState(false);
+    const setOpenMobile = React.useCallback(
+      (_value: boolean | ((value: boolean) => boolean)) => {
+        if (FORCE_SIDEBAR_CLOSED) {
+          _setOpenMobile(false);
+          return;
+        }
+        _setOpenMobile((prev) =>
+          typeof _value === 'function' ? _value(prev) : _value,
+        );
+      },
+      [],
     );
-    const open = openProp ?? _open;
+
+    // Desktop sidebar state (kept, but forced closed)
+    const [_open, _setOpen] = React.useState(false);
+    const open = FORCE_SIDEBAR_CLOSED ? false : (openProp ?? _open);
+
     const setOpen = React.useCallback(
-      (value: boolean | ((value: boolean) => boolean)) => {
-        const openState = typeof value === 'function' ? value(open) : value;
+      (_value: boolean | ((value: boolean) => boolean)) => {
+        if (FORCE_SIDEBAR_CLOSED) {
+          setOpenProp?.(false);
+          _setOpen(false);
+          return;
+        }
+
+        const openState =
+          typeof _value === 'function' ? _value(open) : _value;
+
         if (setOpenProp) {
           setOpenProp(openState);
         } else {
           _setOpen(openState);
         }
-
-        setSidebarStateToLocalStorage(openState);
       },
-      [setOpenProp, open],
+      [FORCE_SIDEBAR_CLOSED, open, setOpenProp],
     );
 
-    // Helper to toggle the sidebar.
+    // ✅ Toggle should never open it
     const toggleSidebar = React.useCallback(() => {
-      return isMobile
-        ? setOpenMobile((open) => !open)
-        : setOpen((open) => !open);
-    }, [isMobile, setOpen, setOpenMobile]);
+      if (FORCE_SIDEBAR_CLOSED) {
+        _setOpenMobile(false);
+        setOpen(false);
+        return;
+      }
 
-    // Adds a keyboard shortcut to toggle the sidebar.
+      return isMobile
+        ? setOpenMobile((v) => !v)
+        : setOpen((v) => !v);
+    }, [FORCE_SIDEBAR_CLOSED, isMobile, setOpen, setOpenMobile]);
+
+    // ✅ Disable keyboard shortcut opening it
     React.useEffect(() => {
+      if (FORCE_SIDEBAR_CLOSED) return;
+
       const handleKeyDown = (event: KeyboardEvent) => {
         if (
           event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
@@ -122,19 +153,17 @@ const SidebarProvider = React.forwardRef<
 
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [toggleSidebar]);
+    }, [FORCE_SIDEBAR_CLOSED, toggleSidebar]);
 
-    // We add a state so that we can do data-state="expanded" or "collapsed".
-    // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? 'expanded' : 'collapsed';
 
-    const contextValue = React.useMemo<SidebarContextProps>(
+    const contextValue = React.useMemo(
       () => ({
         state,
         open,
         setOpen,
         isMobile,
-        openMobile,
+        openMobile: FORCE_SIDEBAR_CLOSED ? false : openMobile,
         setOpenMobile,
         toggleSidebar,
       }),
@@ -146,6 +175,7 @@ const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        FORCE_SIDEBAR_CLOSED,
       ],
     );
 
@@ -174,6 +204,7 @@ const SidebarProvider = React.forwardRef<
     );
   },
 );
+
 SidebarProvider.displayName = 'SidebarProvider';
 
 const Sidebar = React.forwardRef<

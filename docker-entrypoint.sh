@@ -4,7 +4,7 @@
 set -e
 
 # Set default values if not provided
-export AP_APP_TITLE="${AP_APP_TITLE:-SalesOptAi}"
+export AP_APP_TITLE="${AP_APP_TITLE:-NexOpta}"
 export AP_FAVICON_URL="${AP_FAVICON_URL:-statics/favicon.png}"
 
 # Debug: Print environment variables

@@ -59,7 +59,7 @@ const TutorialsDialog = ({
     gettingStarted: {
       icon: <Star className="size-4"></Star>,
       name: t('Intro'),
-      description: t('Get started with SalesOptAi'),
+      description: t('Get started with NexOpta'),
       link: `https://www.youtube.com/embed/b97bgcOigIs?si=Zlly9_WkP1oOnJ-K`,
     },
     flows: {

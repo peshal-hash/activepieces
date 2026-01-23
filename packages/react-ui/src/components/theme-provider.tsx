@@ -54,7 +54,7 @@ export function ThemeProvider({
 
     const resolvedTheme = theme === 'system' ? 'light' : theme;
     root.classList.remove('light', 'dark');
-    document.title = 'SalesOptAi'; // Changed from branding.websiteName
+    document.title = 'NexOpta'; // Changed from branding.websiteName
     document.documentElement.style.setProperty(
       '--primary',
       colorsUtils.hexToHslString(branding.colors.primary.default),
