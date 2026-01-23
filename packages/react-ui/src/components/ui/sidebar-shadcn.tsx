@@ -70,9 +70,10 @@ const SidebarProvider = React.forwardRef<
 >(
   (
     {
+      // props kept for API compatibility but ignored (we force closed)
       defaultOpen,
       open: openProp,
-      onOpenChange: setOpenProp,
+      onOpenChange: onOpenChangeProp,
       className,
       style,
       children,
@@ -83,100 +84,45 @@ const SidebarProvider = React.forwardRef<
     const isMobile = useIsMobile();
 
     // ✅ Force sidebar to always be closed
-    const FORCE_SIDEBAR_CLOSED = true;
+    const open = false;
+    const openMobile = false;
+    const state: SidebarContextProps['state'] = 'collapsed';
 
-    // Mobile sidebar state (kept, but forced closed)
-    const [openMobile, _setOpenMobile] = React.useState(false);
-    const setOpenMobile = React.useCallback(
-      (_value: boolean | ((value: boolean) => boolean)) => {
-        if (FORCE_SIDEBAR_CLOSED) {
-          _setOpenMobile(false);
-          return;
-        }
-        _setOpenMobile((prev) =>
-          typeof _value === 'function' ? _value(prev) : _value,
-        );
-      },
-      [],
-    );
-
-    // Desktop sidebar state (kept, but forced closed)
-    const [_open, _setOpen] = React.useState(false);
-    const open = FORCE_SIDEBAR_CLOSED ? false : (openProp ?? _open);
-
+    // ✅ Never allow opening
     const setOpen = React.useCallback(
-      (_value: boolean | ((value: boolean) => boolean)) => {
-        if (FORCE_SIDEBAR_CLOSED) {
-          setOpenProp?.(false);
-          _setOpen(false);
-          return;
-        }
-
-        const openState =
-          typeof _value === 'function' ? _value(open) : _value;
-
-        if (setOpenProp) {
-          setOpenProp(openState);
-        } else {
-          _setOpen(openState);
+      (_next: boolean) => {
+        onOpenChangeProp?.(false);
+        try {
+          setSidebarStateToLocalStorage(false);
+        } catch {
+          // ignore storage errors (SSR / privacy mode)
         }
       },
-      [FORCE_SIDEBAR_CLOSED, open, setOpenProp],
+      [onOpenChangeProp],
     );
 
-    // ✅ Toggle should never open it
+    const setOpenMobile = React.useCallback((_next: boolean) => {
+      // no-op: always closed
+    }, []);
+
     const toggleSidebar = React.useCallback(() => {
-      if (FORCE_SIDEBAR_CLOSED) {
-        _setOpenMobile(false);
-        setOpen(false);
-        return;
-      }
+      // no-op: always closed
+      setOpen(false);
+      setOpenMobile(false);
+    }, [setOpen, setOpenMobile]);
 
-      return isMobile
-        ? setOpenMobile((v) => !v)
-        : setOpen((v) => !v);
-    }, [FORCE_SIDEBAR_CLOSED, isMobile, setOpen, setOpenMobile]);
-
-    // ✅ Disable keyboard shortcut opening it
-    React.useEffect(() => {
-      if (FORCE_SIDEBAR_CLOSED) return;
-
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (
-          event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-          (event.metaKey || event.ctrlKey)
-        ) {
-          event.preventDefault();
-          toggleSidebar();
-        }
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [FORCE_SIDEBAR_CLOSED, toggleSidebar]);
-
-    const state = open ? 'expanded' : 'collapsed';
-
-    const contextValue = React.useMemo(
+    // ✅ Ensure TS keeps correct literal types
+    const contextValue = React.useMemo<SidebarContextProps>(
       () => ({
         state,
         open,
         setOpen,
-        isMobile,
-        openMobile: FORCE_SIDEBAR_CLOSED ? false : openMobile,
-        setOpenMobile,
-        toggleSidebar,
-      }),
-      [
-        state,
-        open,
-        setOpen,
-        isMobile,
         openMobile,
         setOpenMobile,
+        isMobile,
         toggleSidebar,
-        FORCE_SIDEBAR_CLOSED,
-      ],
+      }),
+      [state, open, setOpen, openMobile, setOpenMobile, isMobile, toggleSidebar],
     );
 
     return (
