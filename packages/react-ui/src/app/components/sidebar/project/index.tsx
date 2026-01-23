@@ -1,4 +1,4 @@
-import { User } from 'lucide-react';
+import { Layers, Workflow } from 'lucide-react';
 
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -35,20 +35,7 @@ const ProjectSideBarItem = ({
   handleProjectSelect,
 }: ProjectSideBarItemProps) => {
   const { state } = useSidebar();
-  const projectAvatar =
-    project.type === ProjectType.TEAM ? (
-      <Avatar
-        className="size-6 flex items-center justify-center rounded-sm cursor-pointer"
-        style={{
-          backgroundColor: PROJECT_COLOR_PALETTE[project.icon.color].color,
-          color: PROJECT_COLOR_PALETTE[project.icon.color].textColor,
-        }}
-      >
-        {project.displayName.charAt(0).toUpperCase()}
-      </Avatar>
-    ) : (
-      <User className="size-5 flex items-center justify-center cursor-pointer" />
-    );
+  const projectAvatar =<Layers className="size-5 flex items-center justify-center cursor-pointer" />;
   return (
     <SidebarMenuItem>
       {state === 'collapsed' ? (
@@ -67,7 +54,7 @@ const ProjectSideBarItem = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right" align="center">
-              {project.displayName}
+              Projects
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -84,8 +71,7 @@ const ProjectSideBarItem = ({
           >
             <div className="flex-1 flex items-center gap-2 min-w-0">
               <ApProjectDisplay
-                title={getProjectName(project)}
-                icon={project.icon}
+                title="Projects"
                 maxLengthToNotShowTooltip={28}
                 projectType={project.type}
               />

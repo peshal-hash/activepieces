@@ -1,4 +1,4 @@
-import { User } from 'lucide-react';
+import { Layers } from 'lucide-react';
 
 import { Avatar } from '@/components/ui/avatar';
 import {
@@ -31,20 +31,8 @@ export const ApProjectDisplay = ({
   maxLengthToNotShowTooltip = 30,
   projectType,
 }: ApProjectDisplayProps) => {
-  const projectAvatar = isNil(icon) ? null : projectType ===
-    ProjectType.TEAM ? (
-    <Avatar
-      className="size-6 flex items-center justify-center rounded-sm"
-      style={{
-        backgroundColor: PROJECT_COLOR_PALETTE[icon.color].color,
-        color: PROJECT_COLOR_PALETTE[icon.color].textColor,
-      }}
-    >
-      {title.charAt(0).toUpperCase()}
-    </Avatar>
-  ) : (
-    <User className="size-5 flex items-center justify-center" />
-  );
+  const projectAvatar =
+    <Layers className="size-5 flex items-center justify-center" />;
 
   const shouldShowTooltip = title.length > maxLengthToNotShowTooltip;
   const displayText = shouldShowTooltip

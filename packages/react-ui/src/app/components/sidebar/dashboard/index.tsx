@@ -48,8 +48,6 @@ import { SidebarGeneralItemType } from '../ap-sidebar-group';
 import { ApSidebarItem, SidebarItemType } from '../ap-sidebar-item';
 import ProjectSideBarItem from '../project';
 import { AppSidebarHeader } from '../sidebar-header';
-import SidebarUsageLimits from '../sidebar-usage-limits';
-import { SidebarUser } from '../sidebar-user';
 
 export function ProjectDashboardSidebar() {
   const { data: projects } = projectCollectionUtils.useAll();
@@ -115,7 +113,6 @@ export function ProjectDashboardSidebar() {
     [navigate],
   );
 
-  // Virtual scrolling setup
   const ITEM_HEIGHT = state === 'collapsed' ? 40 : 44;
 
   const rowVirtualizer = useVirtualizer({
@@ -236,7 +233,7 @@ export function ProjectDashboardSidebar() {
                             size="icon"
                             className="h-6 w-6 hover:bg-accent"
                           >
-                            <Plus />
+                            <Workflow />
                           </Button>
                         </NewProjectDialog>
                       ) : (
@@ -249,7 +246,7 @@ export function ProjectDashboardSidebar() {
                                 disabled
                                 className="h-6 w-6"
                               >
-                                <Plus />
+                                <Workflow/>
                               </Button>
                             </div>
                           </TooltipTrigger>
