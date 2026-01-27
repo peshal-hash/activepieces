@@ -54,6 +54,7 @@ class WorkflowPayload(BaseModel):
     password: str
     firstName: Optional[str] = "Workflow"
     lastName: Optional[str] = "User"
+    projectId: Optional[str] = None
 
 
 def _filtered_outgoing_headers(incoming: Dict[str, str]) -> Dict[str, str]:
@@ -72,36 +73,38 @@ def _filtered_outgoing_headers(incoming: Dict[str, str]) -> Dict[str, str]:
     }
     return {k: v for k, v in incoming.items() if k.lower() not in hop_by_hop}
 
-
-def url_rewrite(content, content_type: str, token_to_inject: Optional[str]):
-    """
-    Rewrites upstream origin references to the proxy origin and injects an auth token
-    into HTML documents for the client-side application.
-    """
-    upstream_origin = config.AP_BASE_URL  # e.g., https://upstream.example.com
-    proxy_origin = config.AP_PROXY_URL      # e.g., https://proxy.example.com
+def url_rewrite(content, content_type: str, token_to_inject: Optional[str], project_id_to_inject: Optional[str]):
+    upstream_origin = config.AP_BASE_URL
+    proxy_origin = config.AP_PROXY_URL
 
     content_str = None
     if "text" in content_type or "javascript" in content_type or "json" in content_type:
         try:
             content_str = content.decode("utf-8")
         except (UnicodeDecodeError, AttributeError):
-            content_str = content  # Already a string
+            content_str = content
 
-        # Perform token injection for HTML content
         if "html" in content_type and token_to_inject:
-            soup = BeautifulSoup(content_str, 'html.parser')
-            body = soup.find('body')
+            soup = BeautifulSoup(content_str, "html.parser")
+            body = soup.find("body")
             if body:
-                # This script runs in the user's browser to set the token
-                script_content = f"localStorage.setItem('token', '{token_to_inject}');"
-                script_tag = soup.new_tag('script')
+                token_js = json.dumps(token_to_inject)
+                pid_js = json.dumps(project_id_to_inject) if project_id_to_inject else "null"
+
+                script_content = f"""
+                (function() {{
+                  try {{
+                    localStorage.setItem('token', {token_js});
+                    if ({pid_js} !== null) localStorage.setItem('projectId', {pid_js});
+                  }} catch (e) {{}}
+                }})();
+                """.strip()
+
+                script_tag = soup.new_tag("script")
                 script_tag.string = script_content
-                # Insert the script at the very beginning of the <body>
                 body.insert(0, script_tag)
                 content_str = str(soup)
 
-        # Perform URL rewriting for all applicable text-based content
         if isinstance(content_str, str) and upstream_origin and proxy_origin:
             content_str = content_str.replace(upstream_origin.rstrip("/"), proxy_origin.rstrip("/"))
 
@@ -109,50 +112,56 @@ def url_rewrite(content, content_type: str, token_to_inject: Optional[str]):
 
     return content
 
+
 def _is_https(request: Request) -> bool:
     # If behind a reverse proxy that terminates TLS, trust X-Forwarded-Proto
     xf_proto = request.headers.get("x-forwarded-proto")
     if xf_proto:
         return xf_proto.lower() == "https"
     return request.url.scheme == "https"
-# =========================================================
-# 1) Auth bootstrap
-# =========================================================
+
+
 
 @router.post("/workflow")
-async def workflow(payload: WorkflowPayload,request: Request):
-    token=None
+async def workflow(payload: WorkflowPayload, request: Request):
+    token = None
+    projectId = None
+
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split("Bearer ")[1]
-    if token==None:
+        token = auth_header.split("Bearer ")[1].strip()
+
+    if token:
         try:
-            # This is the first attempt to sign in the user.
-            logger.info("Attempting to sign in...")
-            ap_data = await asyncio.to_thread(activepieces_service.sign_in, payload.email, payload.password)
-            logger.info("Sign in successful.")
+            decoded = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=[config.JWT_ALGORITHM])
+            projectId = decoded.get("projectId")
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
 
-        # STEP 2: Broaden the exception catch. This now handles HTTP errors AND other network issues.
-        except requests.RequestException as e:
-            logger.info(f"Sign in failed with error: {e}. Attempting to sign up instead...")
-            try:
-                ap_data = await asyncio.to_thread(
-                    activepieces_service.sign_up, payload.email, payload.password, payload.firstName, payload.lastName
-                )
-                logger.info("Sign up successful.")
-            except requests.RequestException as signup_error:
-                # If sign-up also fails, raise a clear error.
-                logger.info(f"Sign up also failed: {signup_error}")
-                raise HTTPException(status_code=401, detail=f"Activepieces auth failed on both sign-in and sign-up: {signup_error}")
+        if not projectId:
+            projectId = payload.projectId
 
+    if not token:
+        ap_data = await asyncio.to_thread(activepieces_service.sign_in, payload.email, payload.password)
         db_manager.store_user_data(ap_data)
         token = ap_data.get("token")
+        projectId = ap_data.get("projectId")
+
     if not token:
         raise HTTPException(status_code=500, detail="Failed to get token after auth flow")
+
     redirect_params = {"token": token}
+    if projectId:
+        redirect_params["projectId"] = projectId
+
     redirect_url_with_token = f"{config.AP_PROXY_URL.rstrip('/')}?{urlencode(redirect_params)}"
-    resp = JSONResponse(content={"success": True, "redirectUrl": redirect_url_with_token,"token": token})
-    return resp
+
+    return JSONResponse(content={
+        "success": True,
+        "redirectUrl": redirect_url_with_token,
+        "token": token,
+        "projectId": projectId
+    })
 
 @router.get("/deleteuser", status_code=204)
 async def delete_user(request: Request):
@@ -438,17 +447,21 @@ async def proxy_static_assets(request: Request, rest: str):
     headers = _filtered_outgoing_headers(dict(request.headers))
     full_url = f"{config.AP_BASE_URL.rstrip('/')}/assets/{rest}"
     token=None
+    pid=None
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split("Bearer ")[1]
-        logger.info("--- Found JWT in Authorization header. ---")
+        token = auth_header.split("Bearer ")[1].strip()
+        try:
+            decoded = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=[config.JWT_ALGORITHM])
+            pid = decoded.get("projectId")
+        except JWTError:
+            pass
     try:
         # Use httpx.AsyncClient for async requests
         async with httpx.AsyncClient(timeout=config.TIMEOUT) as client:
             resp = await client.get(full_url, headers=headers)
 
-        # The url_rewrite is still useful for rewriting any URLs inside JS/CSS files
-        content = url_rewrite(resp.content, resp.headers.get("Content-Type", ""), token)
+        content = url_rewrite(resp.content, resp.headers.get("Content-Type", ""), token, pid)
         excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
         out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
 
@@ -501,12 +514,11 @@ async def ap_proxy(request: Request, rest: str = ""):
 
     # --- NEW: Check for JWT in query parameters first ---
     token_from_query = request.query_params.get("token")
-
+    cookie_pid=request.query_params.get("projectId")
     auth_header = request.headers.get("Authorization")
 
     if token_from_query:
         token = token_from_query
-
     elif auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split("Bearer ")[1]
         logger.info("--- Found JWT in Authorization header. ---")
@@ -523,16 +535,12 @@ async def ap_proxy(request: Request, rest: str = ""):
                 config.JWT_SECRET_KEY,
                 algorithms=[config.JWT_ALGORITHM]
             )
-            cookie_pid = payload.get("projectId")
+            if cookie_pid==None:
+                cookie_pid = payload.get("projectId")
             platform_object = payload.get("platform")
 
             if platform_object and isinstance(platform_object, dict):
                 cookie_platform_id = platform_object.get("id")
-            logger.info("********************************************************")
-            logger.info(payload)
-            logger.info("********************************************************")
-            logger.info("JWT decoded successfully. Using credentials from token.")
-
         except JWTError as e:
             # This handles expired tokens, invalid signatures, etc.
             logger.info(f"JWT decoding failed: {e}")
@@ -645,7 +653,7 @@ async def ap_proxy(request: Request, rest: str = ""):
         except Exception:
             pass
 
-    rewritten_content = url_rewrite(resp.content, resp_content_type, token)
+    rewritten_content = url_rewrite(resp.content, resp_content_type, token, cookie_pid)
     excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
     out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
     return Response(content=rewritten_content, status_code=resp.status_code, headers=out_headers)
