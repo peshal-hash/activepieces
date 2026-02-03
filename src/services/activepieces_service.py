@@ -66,7 +66,7 @@ USE_API_PREFIX = True  # set False if you hit Fastify directly
 API = f"{BASE}/api" if USE_API_PREFIX else BASE
 
 def list_projects(service_token: str, limit: int = 50) -> List[Dict]:
-    url = f"{API}/v1/users/projects"
+    url = f"{API}/v1/projects"
     headers = {"Authorization": f"Bearer {service_token}", "Accept": "application/json"}
 
     projects: List[Dict] = []
