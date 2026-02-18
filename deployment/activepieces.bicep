@@ -15,6 +15,8 @@ param deployNewInfrastructure bool
 param smtpHost string = 'smtp.gmail.com'
 param smtpPort int = 587
 param smtpSenderName string = 'NexOpta Msg'
+param badgesEnabled string = 'false'
+param badgeAwardedEmailEnabled string = 'false'
 
 @secure()
 param postgresAdminPassword string
@@ -313,6 +315,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'AP_TELEMETRY_ENABLED'
               value: 'true'
+            }
+            {
+              name: 'AP_BADGES_ENABLED'
+              value: badgesEnabled
+            }
+            {
+              name: 'AP_BADGE_AWARDED_EMAIL_ENABLED'
+              value: badgeAwardedEmailEnabled
             }
             {
               name: 'AP_TEMPLATES_SOURCE_URL'

@@ -22,12 +22,23 @@ const workerEventsChecks: BadgeCheck[] = [
     flowRunsBadgesCheck,
 ]
 
+const isFeatureEnabled = (value: string | undefined, defaultValue = true): boolean => {
+    if (isNil(value)) {
+        return defaultValue
+    }
+    return value.toLowerCase() === 'true'
+}
+
 async function processBadgeChecks(
     checks: BadgeCheck[],
     userId: string | undefined,
     event: AuditEventParam,
     log: FastifyBaseLogger,
 ): Promise<void> {
+    if (!isFeatureEnabled(process.env.AP_BADGES_ENABLED, true)) {
+        return
+    }
+
     const checkResults = await Promise.all(checks.map(badgeCheck => badgeCheck.eval({ userId, event })))
 
     const badgesByUser = new Map<string, (keyof typeof BADGES)[]>()
@@ -62,7 +73,9 @@ async function processBadgeChecks(
                 userId,
             })
 
-            await emailService(log).sendBadgeAwardedEmail(userId, badgeName)
+            if (isFeatureEnabled(process.env.AP_BADGE_AWARDED_EMAIL_ENABLED, true)) {
+                await emailService(log).sendBadgeAwardedEmail(userId, badgeName)
+            }
 
             websocketService.to(userId).emit(WebsocketClientEvent.BADGE_AWARDED, {
                 badge: badgeName,
