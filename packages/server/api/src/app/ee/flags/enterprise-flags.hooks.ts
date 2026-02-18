@@ -10,6 +10,7 @@ import { appearanceHelper } from '../helper/appearance-helper'
 export const enterpriseFlagsHooks: FlagsServiceHooks = {
     async modify({ flags, request }) {
         const modifiedFlags: Record<string, string | boolean | number | Record<string, unknown>> = { ...flags }
+        const badgesEnabled = isNil(process.env.AP_BADGES_ENABLED) || process.env.AP_BADGES_ENABLED.toLowerCase() === 'true'
         const platformIdFromPrincipal = !request.principal || request.principal.type === PrincipalType.UNKNOWN || request.principal.type === PrincipalType.WORKER ? null : request.principal.platform.id
         const platformId = platformIdFromPrincipal ?? await platformUtils.getPlatformIdForRequest(request)
         const edition = system.getEdition()
@@ -40,7 +41,7 @@ export const enterpriseFlagsHooks: FlagsServiceHooks = {
         modifiedFlags[ApFlagId.SHOW_COMMUNITY] = platformWithPlan.plan.showPoweredBy
         modifiedFlags[ApFlagId.SHOW_BILLING_PAGE] = flags[ApFlagId.SHOW_BILLING_PAGE] && !platformUtils.isCustomerOnDedicatedDomain(platformWithPlan)
         modifiedFlags[ApFlagId.CLOUD_AUTH_ENABLED] = platform.cloudAuthEnabled
-        modifiedFlags[ApFlagId.SHOW_BADGES] = !platformWithPlan.plan.embeddingEnabled
+        modifiedFlags[ApFlagId.SHOW_BADGES] = badgesEnabled && !platformWithPlan.plan.embeddingEnabled
         modifiedFlags[ApFlagId.PUBLIC_URL] = await domainHelper.getPublicUrl({
             path: '',
             platformId,
