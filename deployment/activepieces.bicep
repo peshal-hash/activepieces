@@ -273,6 +273,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               value: apiKey
             }
             {
+              name: 'AP_REDIS_TYPE'
+              value: 'STANDALONE'
+            }
+            {
+              name: 'AP_MAX_FLOW_RUN_LOG_SIZE_MB'
+              value: '25'
+            }
+            {
               name: 'AP_ENCRYPTION_KEY'
               value: encryptionKey
             }
