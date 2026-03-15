@@ -3,6 +3,7 @@ import { PieceMetadata } from '@activepieces/pieces-framework'
 import { AppSystemProp, exceptionHandler, rejectedPromiseHandler } from '@activepieces/server-shared'
 import { ApEdition, ApEnvironment, AppConnectionWithoutSensitiveData, Flow, FlowRun, Folder, ProjectRelease, ProjectWithLimits, spreadIfDefined, Template, UserInvitation, UserWithMetaInformation } from '@activepieces/shared'
 import swagger from '@fastify/swagger'
+import swaggerUi from '@fastify/swagger-ui'
 import { createAdapter } from '@socket.io/redis-adapter'
 import { FastifyInstance, FastifyRequest, HTTPMethods } from 'fastify'
 import fastifySocketIO from 'fastify-socket'
@@ -98,7 +99,7 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
     })
 
     await app.register(swagger, {
-        hideUntagged: true,
+        hideUntagged: false,
         openapi: {
             servers: [
                 {
@@ -159,6 +160,14 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
         },
     })
 
+
+    await app.register(swaggerUi, {
+        routePrefix: '/docs',
+        uiConfig: {
+            docExpansion: 'list',
+            deepLinking: true,
+        },
+    })
 
     await app.register(rateLimitModule)
     app.addHook('onResponse', async (request, reply) => {
