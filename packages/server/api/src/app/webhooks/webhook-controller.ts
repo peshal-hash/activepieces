@@ -165,6 +165,7 @@ const WEBHOOK_PARAMS = {
         rawBody: true,
     },
     schema: {
+        tags: ['webhooks'],
         params: WebhookUrlParams,
     },
 }

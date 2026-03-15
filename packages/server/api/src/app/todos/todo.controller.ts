@@ -67,7 +67,7 @@ export const todoController: FastifyPluginAsyncTypebox = async (app) => {
         })
     })
 
-    app.all('/:id/resolve', RequestResolveTodoRequest, async (request) => {
+    app.post('/:id/resolve', RequestResolveTodoRequest, async (request) => {
         const { id } = request.params
         const { status, isTest } = request.query
         return todoService(request.log).resolve({
@@ -97,8 +97,9 @@ export const todoController: FastifyPluginAsyncTypebox = async (app) => {
 }
 
 const DeleteTodoRequest = {
-
     schema: {
+        tags: ['todos'],
+        description: 'Delete a todo',
         params: Type.Object({
             id: Type.String(),
         }),
@@ -114,6 +115,8 @@ const DeleteTodoRequest = {
 
 const ListTodoAssigneesRequest = {
     schema: {
+        tags: ['todos'],
+        description: 'List assignees for todos',
         querystring: ListTodoAssigneesRequestQuery,
         response: {
             [StatusCodes.OK]: SeekPage(UserWithMetaInformation),
@@ -128,6 +131,8 @@ const ListTodoAssigneesRequest = {
 
 const ListTodosRequest = {
     schema: {
+        tags: ['todos'],
+        description: 'List todos',
         querystring: ListTodosQueryParams,
     },
     config: {
@@ -139,6 +144,8 @@ const ListTodosRequest = {
 
 const CreateTodoRequest = {
     schema: {
+        tags: ['todos'],
+        description: 'Create a todo',
         body: CreateTodoRequestBody,
     },
     config: {
@@ -156,6 +163,8 @@ const CreateTodoRequest = {
 
 const RequestResolveTodoRequest = {
     schema: {
+        tags: ['todos'],
+        description: 'Resolve a todo',
         params: Type.Object({
             id: Type.String(),
         }),
@@ -168,6 +177,8 @@ const RequestResolveTodoRequest = {
 
 const GetTodoRequest = {
     schema: {
+        tags: ['todos'],
+        description: 'Get a todo by id',
         params: Type.Object({
             id: Type.String(),
         }),
@@ -182,6 +193,8 @@ const GetTodoRequest = {
 
 const UpdateTodoRequest = {
     schema: {
+        tags: ['todos'],
+        description: 'Update a todo',
         params: Type.Object({
             id: Type.String(),
         }),

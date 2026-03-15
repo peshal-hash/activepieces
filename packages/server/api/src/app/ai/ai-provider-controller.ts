@@ -36,6 +36,10 @@ const ListAIProviders = {
     config: {
         security: securityAccess.publicPlatform([PrincipalType.USER, PrincipalType.ENGINE]),
     },
+    schema: {
+        tags: ['ai-providers'],
+        description: 'List AI providers for the platform',
+    },
 }
 
 const GetAIProviderConfig = {
@@ -43,6 +47,8 @@ const GetAIProviderConfig = {
         security: securityAccess.engine(),
     },
     schema: {
+        tags: ['ai-providers'],
+        description: 'Get AI provider configuration',
         params: Type.Object({
             provider: Type.Enum(AIProviderName),
         }),
@@ -54,6 +60,8 @@ const ListModels = {
         security: securityAccess.publicPlatform([PrincipalType.USER, PrincipalType.ENGINE]),
     },
     schema: {
+        tags: ['ai-providers'],
+        description: 'List models for an AI provider',
         params: Type.Object({
             provider: Type.Enum(AIProviderName),
         }),
@@ -68,6 +76,8 @@ const CreateAIProvider = {
         security: securityAccess.publicPlatform([PrincipalType.USER]),
     },
     schema: {
+        tags: ['ai-providers'],
+        description: 'Create an AI provider',
         body: CreateAIProviderRequest,
     },
 }
@@ -77,6 +87,8 @@ const UpdateAIProvider = {
         security: securityAccess.publicPlatform([PrincipalType.USER]),
     },
     schema: {
+        tags: ['ai-providers'],
+        description: 'Update an AI provider',
         params: Type.Object({
             id: Type.String(),
         }),
@@ -89,6 +101,8 @@ const DeleteAIProvider = {
         security: securityAccess.publicPlatform([PrincipalType.USER]),
     },
     schema: {
+        tags: ['ai-providers'],
+        description: 'Delete an AI provider',
         params: Type.Object({
             id: Type.String(),
         }),

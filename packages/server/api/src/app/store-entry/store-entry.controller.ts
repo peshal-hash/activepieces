@@ -53,6 +53,8 @@ const CreateRequest =  {
         security: securityAccess.engine(),
     },
     schema: {
+        tags: ['store-entries'],
+        description: 'Upsert a store entry',
         body: PutStoreEntryRequest,
     },
 }
@@ -62,6 +64,8 @@ const GetRequest = {
         security: securityAccess.engine(),
     },
     schema: {
+        tags: ['store-entries'],
+        description: 'Get a store entry by key',
         querystring: GetStoreEntryRequest,
     },
 }
@@ -72,6 +76,8 @@ const DeleteStoreRequest = {
         security: securityAccess.engine(),
     },
     schema: {
+        tags: ['store-entries'],
+        description: 'Delete a store entry',
         querystring: DeleteStoreEntryRequest,
     },
 }

@@ -33,6 +33,8 @@ export const todoActivityController: FastifyPluginAsyncTypebox = async (app) => 
 
 const ListTodoCommentsRequest = {
     schema: {
+        tags: ['todos'],
+        description: 'List todo activity comments',
         querystring: ListTodoActivitiesQueryParams,
     },
     config: {
@@ -51,6 +53,8 @@ const ListTodoCommentsRequest = {
 
 const CreateTodoCommentRequest = {
     schema: {
+        tags: ['todos'],
+        description: 'Create a todo activity comment',
         body: CreateTodoActivityRequestBody,
     },
     config: {

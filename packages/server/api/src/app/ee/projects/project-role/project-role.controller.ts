@@ -88,6 +88,9 @@ const GetProjectRoleRequest = {
         security: securityAccess.publicPlatform([PrincipalType.USER, PrincipalType.SERVICE]),
     },
     schema: {
+        tags: ['project-roles'],
+        description: 'Get a project role by id',
+        security: [SERVICE_KEY_SECURITY_OPENAPI],
         params: Type.Object({
             id: ApId,
         }),
@@ -99,6 +102,9 @@ const ListProjectRolesRequest = {
         security: securityAccess.publicPlatform([PrincipalType.USER, PrincipalType.SERVICE]),
     },
     schema: {
+        tags: ['project-roles'],
+        description: 'List all project roles',
+        security: [SERVICE_KEY_SECURITY_OPENAPI],
         response: {
             [StatusCodes.OK]: SeekPage(ProjectRole),
         },
@@ -110,6 +116,8 @@ const CreateProjectRoleRequest = {
         security: securityAccess.platformAdminOnly([PrincipalType.USER, PrincipalType.SERVICE]),
     },
     schema: {
+        tags: ['project-roles'],
+        description: 'Create a project role',
         body: CreateProjectRoleRequestBody,
         response: {
             [StatusCodes.CREATED]: ProjectRole,
@@ -118,10 +126,12 @@ const CreateProjectRoleRequest = {
 }
 
 const UpdateProjectRoleRequest = {
-    config: {   
+    config: {
         security: securityAccess.platformAdminOnly([PrincipalType.USER, PrincipalType.SERVICE]),
     },
     schema: {
+        tags: ['project-roles'],
+        description: 'Update a project role',
         body: UpdateProjectRoleRequestBody,
         params: Type.Object({
             id: ApId,
@@ -137,6 +147,8 @@ const DeleteProjectRoleRequest = {
         security: securityAccess.platformAdminOnly([PrincipalType.USER, PrincipalType.SERVICE]),
     },
     schema: {
+        tags: ['project-roles'],
+        description: 'Delete a project role',
         params: Type.Object({
             name: Type.String(),
         }),

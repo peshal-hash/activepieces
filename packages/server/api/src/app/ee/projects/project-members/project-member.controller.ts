@@ -72,6 +72,9 @@ const GetCurrentProjectMemberRoleRequest = {
         ),
     },
     schema: {
+        tags: ['project-members'],
+        description: 'Get the current user project member role',
+        security: [SERVICE_KEY_SECURITY_OPENAPI],
         querystring: GetCurrentProjectMemberRoleQuery,
     },
 }
@@ -88,13 +91,16 @@ const UpdateProjectMemberRoleRequest = {
         ),
     },
     schema: {
+        tags: ['project-members'],
+        description: 'Update a project member role',
+        security: [SERVICE_KEY_SECURITY_OPENAPI],
         params: Type.Object({
             id: Type.String(),
         }),
         body: UpdateProjectMemberRoleRequestBody,
-    },
-    response: {
-        [StatusCodes.OK]: ProjectMemberWithUser,
+        response: {
+            [StatusCodes.OK]: ProjectMemberWithUser,
+        },
     },
 }
 

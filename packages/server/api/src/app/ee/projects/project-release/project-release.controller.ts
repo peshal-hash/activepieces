@@ -64,6 +64,9 @@ const GetProjectReleaseRequest = {
         ),
     },
     schema: {
+        tags: ['project-releases'],
+        description: 'Get a project release by id',
+        security: [SERVICE_KEY_SECURITY_OPENAPI],
         params: Type.Object({
             id: ApId,
         }),
@@ -81,6 +84,9 @@ const ListProjectReleasesRequestParams = {
         ),
     },
     schema: {
+        tags: ['project-releases'],
+        description: 'List project releases',
+        security: [SERVICE_KEY_SECURITY_OPENAPI],
         querystring: ListProjectReleasesRequest,
         response: {
             [StatusCodes.OK]: SeekPage(ProjectRelease),
@@ -99,6 +105,8 @@ const DiffProjectReleaseRequest = {
         ),
     },
     schema: {
+        tags: ['project-releases'],
+        description: 'Get a diff plan for a project release',
         body: DiffReleaseRequest,
     },
 }
