@@ -436,6 +436,49 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
 
 
 
+@router.api_route("/docs", methods=["GET"])
+@router.api_route("/docs/{rest:path}", methods=["GET"])
+async def proxy_ap_docs(request: Request, rest: str = ""):
+    """
+    Clean passthrough to Activepieces Swagger UI.
+    Bypasses JWT injection and URL rewriting so the Swagger HTML/JS renders correctly.
+    """
+    upstream_path = f"/docs/{rest}".rstrip("/") if rest else "/docs"
+    full_url = f"http://localhost:3000{upstream_path}"
+    qs = str(request.url.query)
+    if qs:
+        full_url = f"{full_url}?{qs}"
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            resp = await client.get(full_url, headers={"host": "localhost"})
+        excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+        out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
+        return Response(content=resp.content, status_code=resp.status_code, headers=out_headers)
+    except httpx.RequestError as e:
+        return Response(content=f"Could not reach Activepieces docs: {e}", status_code=502)
+
+
+@router.api_route("/v1/docs", methods=["GET"])
+@router.api_route("/v1/docs/{rest:path}", methods=["GET"])
+async def proxy_ap_openapi_json(request: Request, rest: str = ""):
+    """
+    Clean passthrough to Activepieces raw OpenAPI JSON spec at /v1/docs/.
+    """
+    upstream_path = f"/v1/docs/{rest}".rstrip("/") if rest else "/v1/docs"
+    full_url = f"http://localhost:3000{upstream_path}"
+    qs = str(request.url.query)
+    if qs:
+        full_url = f"{full_url}?{qs}"
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            resp = await client.get(full_url, headers={"host": "localhost"})
+        excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+        out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
+        return Response(content=resp.content, status_code=resp.status_code, headers=out_headers)
+    except httpx.RequestError as e:
+        return Response(content=f"Could not reach Activepieces OpenAPI spec: {e}", status_code=502)
+
+
 @router.api_route("/assets/{rest:path}", methods=["GET"])
 async def proxy_static_assets(request: Request, rest: str):
     """
