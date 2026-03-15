@@ -145,6 +145,8 @@ const UpdatePlatformRequest = {
         security: securityAccess.platformAdminOnly([PrincipalType.USER]),
     },
     schema: {
+        tags: ['platforms'],
+        description: 'Update a platform',
         body: UpdatePlatformRequestBody,
         params: Type.Object({
             id: ApId,
@@ -178,6 +180,8 @@ const DeletePlatformRequest = {
         security: securityAccess.platformAdminOnly([PrincipalType.USER]),
     },
     schema: {
+        tags: ['platforms'],
+        description: 'Delete a platform',
         params: Type.Object({
             id: ApId,
         }),
@@ -189,6 +193,8 @@ const GetAssetRequest = {
         security: securityAccess.public(),
     },
     schema: {
+        tags: ['platforms'],
+        description: 'Get a platform asset',
         params: Type.Object({
             id: Type.String(),
         }),

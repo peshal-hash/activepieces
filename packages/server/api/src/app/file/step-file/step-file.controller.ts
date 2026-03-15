@@ -89,6 +89,8 @@ const SignedFileRequest = {
         security: securityAccess.public(),
     },
     schema: {
+        tags: ['step-files'],
+        description: 'Download a step file using a signed token',
         querystring: Type.Object({
             token: Type.String(),
         }),
@@ -100,6 +102,8 @@ const UpsertStepFileRequest = {
         security: securityAccess.engine(),
     },
     schema: {
+        tags: ['step-files'],
+        description: 'Upload or update a step file',
         body: StepFileUpsertRequest,
     },
 }

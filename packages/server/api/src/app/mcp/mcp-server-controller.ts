@@ -89,6 +89,8 @@ const StreamableHttpRequestRequest = {
         skipAuth: true,
     },
     schema: {
+        tags: ['mcp'],
+        description: 'Handle a streamable HTTP MCP request',
         params: Type.Object({
             projectId: ApId,
         }),
@@ -174,8 +176,8 @@ const RotateTokenRequest = {
     schema: {
         tags: ['mcp'],
         description: 'Rotate the MCP server token',
+        params: Type.Object({
+            projectId: ApId,
+        }),
     },
-    params: Type.Object({
-        projectId: ApId,
-    }),
 }

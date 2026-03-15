@@ -97,6 +97,8 @@ const SwitchPlatformRequestOptions = {
         rateLimit: rateLimitOptions,
     },
     schema: {
+        tags: ['authentication'],
+        description: 'Switch to a different platform',
         body: SwitchPlatformRequest,
     },
 }
@@ -107,6 +109,8 @@ const SignUpRequestOptions = {
         rateLimit: rateLimitOptions,
     },
     schema: {
+        tags: ['authentication'],
+        description: 'Sign up for an account',
         body: SignUpRequest,
     },
 }
@@ -117,6 +121,8 @@ const SignInRequestOptions = {
         rateLimit: rateLimitOptions,
     },
     schema: {
+        tags: ['authentication'],
+        description: 'Sign in to an account',
         body: SignInRequest,
     },
 }

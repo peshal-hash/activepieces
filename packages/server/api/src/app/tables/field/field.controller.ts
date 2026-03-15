@@ -60,10 +60,12 @@ const CreateRequest = {
         }),
     },
     schema: {
+        tags: ['fields'],
+        description: 'Create a table field',
         body: CreateFieldRequest,
-    },
-    response: {
-        [StatusCodes.CREATED]: Field,
+        response: {
+            [StatusCodes.CREATED]: Field,
+        },
     },
 }
 
@@ -75,6 +77,8 @@ const GetFieldByIdRequest = {
         }),
     },
     schema: {
+        tags: ['fields'],
+        description: 'Get a field by id',
         params: Type.Object({
             id: Type.String(),
         }),
@@ -89,6 +93,8 @@ const DeleteFieldRequest = {
         }),
     },
     schema: {
+        tags: ['fields'],
+        description: 'Delete a field',
         params: Type.Object({
             id: Type.String(),
         }),
@@ -108,6 +114,8 @@ const GetFieldsRequest = {
         }),
     },
     schema: {
+        tags: ['fields'],
+        description: 'List all fields for a table',
         querystring: ListFieldsRequestQuery,
     },
 }
@@ -120,6 +128,8 @@ const UpdateRequest = {
         }),
     },
     schema: {
+        tags: ['fields'],
+        description: 'Update a field',
         params: Type.Object({
             id: Type.String(),
         }),

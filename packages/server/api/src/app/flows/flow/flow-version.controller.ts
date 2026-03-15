@@ -39,6 +39,8 @@ const ListVersionParams = {
         }),
     },
     schema: {
+        tags: ['flows'],
+        description: 'List versions for a flow',
         params: Type.Object({
             flowId: Type.String(),
         }),

@@ -300,12 +300,15 @@ const ListFlowsRequestOptions = {
 const CountFlowsRequestOptions = {
     config: {
         security: securityAccess.project(
-            [PrincipalType.USER, PrincipalType.SERVICE], 
+            [PrincipalType.USER, PrincipalType.SERVICE],
             Permission.READ_FLOW, {
                 type: ProjectResourceType.QUERY,
             }),
     },
     schema: {
+        tags: ['flows'],
+        description: 'Count flows',
+        security: [SERVICE_KEY_SECURITY_OPENAPI],
         querystring: CountFlowsRequest,
     },
 }

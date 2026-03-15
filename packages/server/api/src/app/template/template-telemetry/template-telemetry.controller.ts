@@ -16,6 +16,8 @@ const SendEventParams = {
         security: securityAccess.public(),
     },
     schema: {
+        tags: ['templates'],
+        description: 'Send a template telemetry event',
         body: TemplateTelemetryEvent,
     },
 }
