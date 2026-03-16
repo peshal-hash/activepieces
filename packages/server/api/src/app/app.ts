@@ -103,8 +103,8 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
         openapi: {
             servers: [
                 {
-                    url: 'https://cloud.activepieces.com/api',
-                    description: 'Production Server',
+                    url: '/api',
+                    description: 'Local Server',
                 },
             ],
             components: {
@@ -152,10 +152,6 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
             info: {
                 title: 'Activepieces Documentation',
                 version: '0.0.0',
-            },
-            externalDocs: {
-                url: 'https://www.activepieces.com/docs',
-                description: 'Find more info here',
             },
         },
     })
