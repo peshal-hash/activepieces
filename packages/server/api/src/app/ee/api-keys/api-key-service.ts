@@ -12,6 +12,7 @@ import {
     secureApId,
     SeekPage,
 } from '@activepieces/shared'
+import { FindOptionsWhere, IsNull } from 'typeorm'
 import { repoFactory } from '../../core/db/repo-factory'
 import { ApiKeyEntity } from './api-key-entity'
 
@@ -21,12 +22,14 @@ const repo = repoFactory<ApiKey>(ApiKeyEntity)
 export const apiKeyService = {
     async add({
         platformId,
+        userId,
         displayName,
     }: AddParams): Promise<ApiKeyResponseWithValue> {
         const generatedApiKey = generateApiKey()
         const savedApiKey = await repo().save({
             id: apId(),
             platformId,
+            userId,
             displayName,
             hashedValue: generatedApiKey.secretHashed,
             truncatedValue: generatedApiKey.secretTruncated,
@@ -48,9 +51,15 @@ export const apiKeyService = {
         }
         return apiKey
     },
-    async list({ platformId }: ListParams): Promise<SeekPage<ApiKey>> {
-        const data = await repo().findBy({
-            platformId,
+    async list({ platformId, userId }: ListParams): Promise<SeekPage<ApiKey>> {
+        const data = await repo().find({
+            where: buildOwnerWhere({
+                platformId,
+                userId,
+            }),
+            order: {
+                created: 'DESC',
+            },
         })
 
         return {
@@ -59,11 +68,15 @@ export const apiKeyService = {
             previous: null,
         }
     },
-    async delete({ platformId, id }: DeleteParams): Promise<void> {
-        const apiKey = await repo().findOneBy({
-            platformId,
+    async delete({ platformId, id, userId }: DeleteParams): Promise<void> {
+        const where: FindOptionsWhere<ApiKey> = {
             id,
-        })
+            ...buildOwnerWhere({
+                platformId,
+                userId,
+            }),
+        }
+        const apiKey = await repo().findOneBy(where)
         if (isNil(apiKey)) {
             throw new ActivepiecesError({
                 code: ErrorCode.ENTITY_NOT_FOUND,
@@ -72,10 +85,7 @@ export const apiKeyService = {
                 },
             })
         }
-        await repo().delete({
-            platformId,
-            id,
-        })
+        await repo().delete(where)
     },
 }
 
@@ -91,14 +101,30 @@ export function generateApiKey() {
 
 type AddParams = {
     platformId: string
+    userId?: string
     displayName: string
 }
 
 type DeleteParams = {
     id: string
     platformId: string
+    userId?: string
 }
 
 type ListParams = {
     platformId?: string
+    userId?: string
+}
+
+function buildOwnerWhere({
+    platformId,
+    userId,
+}: {
+    platformId?: string
+    userId?: string
+}): FindOptionsWhere<ApiKey> {
+    return {
+        ...(platformId ? { platformId } : {}),
+        userId: isNil(userId) ? IsNull() : userId,
+    }
 }

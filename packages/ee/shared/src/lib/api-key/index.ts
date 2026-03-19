@@ -4,10 +4,11 @@ import { Static, Type } from '@sinclair/typebox'
 export const ApiKey = Type.Object({
     ...BaseModelSchema,
     platformId: ApId,
+    userId: Type.Optional(Type.Union([ApId, Type.Null()])),
     displayName: Type.String(),
     hashedValue: Type.String(),
     truncatedValue: Type.String(),
-    lastUsedAt: Type.Optional(Type.String()),
+    lastUsedAt: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 })
 
 export type ApiKey = Static<typeof ApiKey>

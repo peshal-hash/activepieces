@@ -348,6 +348,7 @@ export const createMockApiKey = (
         updated: apiKey?.updated ?? faker.date.recent().toISOString(),
         displayName: apiKey?.displayName ?? faker.lorem.word(),
         platformId: apiKey?.platformId ?? apId(),
+        userId: apiKey?.userId,
         hashedValue: secretHashed,
         value: secret,
         truncatedValue: secretTruncated,

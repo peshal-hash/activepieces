@@ -29,6 +29,15 @@ async function createPrincipalForApiKey(apiKeyValue: string): Promise<Principal>
             },
         })
     }
+    if (!isNil(apiKey.userId)) {
+        return {
+            id: apiKey.userId,
+            type: PrincipalType.USER,
+            platform: {
+                id: apiKey.platformId,
+            },
+        }
+    }
     return {
         id: apiKey.id,
         type: PrincipalType.SERVICE,
@@ -37,4 +46,3 @@ async function createPrincipalForApiKey(apiKeyValue: string): Promise<Principal>
         },
     }
 }
-

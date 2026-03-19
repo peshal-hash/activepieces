@@ -12,8 +12,10 @@ import { databaseConnection } from '../../../../src/app/database/database-connec
 import { setupServer } from '../../../../src/app/server'
 import { generateMockToken } from '../../../helpers/auth'
 import {
+    createMockApiKey,
     mockAndSaveBasicSetup,
     mockAndSaveBasicSetupWithApiKey,
+    mockBasicUser,
 } from '../../../helpers/mocks'
 
 let app: FastifyInstance | null = null
@@ -39,6 +41,31 @@ describe('authenticateOrThrow', () => {
             expect(principal).toEqual({
                 id: mockApiKey.id,
                 type: PrincipalType.SERVICE,
+                platform: {
+                    id: mockPlatform.id,
+                },
+            })
+        })
+
+        it('should authenticate with valid user-owned API key as USER principal', async () => {
+            const { mockPlatform } = await mockAndSaveBasicSetup()
+            const { mockUser } = await mockBasicUser({
+                user: {
+                    platformId: mockPlatform.id,
+                },
+            })
+
+            const mockApiKey = createMockApiKey({
+                platformId: mockPlatform.id,
+                userId: mockUser.id,
+            })
+            await databaseConnection().getRepository('api_key').save(mockApiKey)
+
+            const principal = await authenticateOrThrow(`Bearer ${mockApiKey.value}`)
+
+            expect(principal).toEqual({
+                id: mockUser.id,
+                type: PrincipalType.USER,
                 platform: {
                     id: mockPlatform.id,
                 },
