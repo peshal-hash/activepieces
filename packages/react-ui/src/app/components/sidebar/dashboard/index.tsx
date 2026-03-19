@@ -48,6 +48,7 @@ import { SidebarGeneralItemType } from '../ap-sidebar-group';
 import { ApSidebarItem, SidebarItemType } from '../ap-sidebar-item';
 import ProjectSideBarItem from '../project';
 import { AppSidebarHeader } from '../sidebar-header';
+import { SidebarUser } from '../sidebar-user';
 
 export function ProjectDashboardSidebar() {
   const { data: projects } = projectCollectionUtils.useAll();
@@ -357,6 +358,9 @@ export function ProjectDashboardSidebar() {
             </div>
           </SidebarGroup>
         </SidebarContent>
+        <SidebarFooter onClick={(e) => e.stopPropagation()}>
+          <SidebarUser />
+        </SidebarFooter>
       </Sidebar>
     )
   );
