@@ -102,7 +102,7 @@ export const STANDARD_CLOUD_PLAN: PlatformPlanWithOnlyLimits = {
     teamProjectsLimit: TeamProjectsLimit.ONE,
     projectRolesEnabled: false,
     customDomainsEnabled: false,
-    apiKeysEnabled: false,
+    apiKeysEnabled: true,
     ssoEnabled: false,
 }
 
@@ -125,7 +125,7 @@ export const OPEN_SOURCE_PLAN: PlatformPlanWithOnlyLimits = {
     teamProjectsLimit: TeamProjectsLimit.NONE,
     projectRolesEnabled: false,
     customDomainsEnabled: false,
-    apiKeysEnabled: false,
+    apiKeysEnabled: true,
     ssoEnabled: false,
     stripeCustomerId: undefined,
     stripeSubscriptionId: undefined,
