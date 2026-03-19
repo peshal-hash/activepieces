@@ -1,6 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { t } from 'i18next';
-import { Search, Plus, LineChart, Workflow, Compass } from 'lucide-react';
+import { Search, Plus, LineChart, Workflow, Compass, Shield } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDebounce } from 'use-debounce';
@@ -31,6 +31,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { templatesTelemetryApi } from '@/features/templates/lib/templates-telemetry-api';
+import { useShowPlatformAdminDashboard } from '@/hooks/authorization-hooks';
 import { platformHooks } from '@/hooks/platform-hooks';
 import { projectCollectionUtils } from '@/hooks/project-collection';
 import { userHooks } from '@/hooks/user-hooks';
@@ -62,6 +63,7 @@ export function ProjectDashboardSidebar() {
   const projectsScrollRef = useRef<HTMLDivElement>(null);
   const { data: currentUser } = userHooks.useCurrentUser();
   const { platform } = platformHooks.useCurrentPlatform();
+  const showPlatformAdmin = useShowPlatformAdminDashboard();
 
   useEffect(() => {
     if (!searchOpen) {
@@ -180,7 +182,17 @@ export function ProjectDashboardSidebar() {
     isSubItem: false,
   };
 
-  const items = [exploreLink, impactLink].filter(
+  const platformAdminLink: SidebarItemType = {
+    type: 'link',
+    to: '/platform',
+    label: t('Platform Admin'),
+    show: true,
+    icon: Shield,
+    hasPermission: showPlatformAdmin && !embedState.isEmbedded,
+    isSubItem: false,
+  };
+
+  const items = [exploreLink, impactLink, platformAdminLink].filter(
     permissionFilter,
   );
 
