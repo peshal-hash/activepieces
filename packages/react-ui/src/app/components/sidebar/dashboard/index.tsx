@@ -358,9 +358,6 @@ export function ProjectDashboardSidebar() {
             </div>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter onClick={(e) => e.stopPropagation()}>
-          <SidebarUser />
-        </SidebarFooter>
       </Sidebar>
     )
   );

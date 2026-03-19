@@ -333,18 +333,7 @@ export function SidebarComponent({
                 </ScrollArea>
               </div>
               <SidebarFooter className="pb-4 flex-shrink-0">
-                {/* <SidebarMenu>
-                  <SidebarInviteUserButton />
-                </SidebarMenu>
-                <SidebarMenu>
-                  <HelpAndFeedback />
-                </SidebarMenu>
-                {showProjectUsage && (
-                  <SidebarMenu>
-                    <UsageLimitsButton />
-                  </SidebarMenu>
-                )}
-                <SidebarUser /> */}
+                <SidebarUser />
               </SidebarFooter>
             </SidebarContent>
           </Sidebar>
