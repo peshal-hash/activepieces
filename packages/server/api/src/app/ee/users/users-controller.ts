@@ -1,3 +1,8 @@
+import {
+    ApiKeyResponseWithoutValue,
+    ApiKeyResponseWithValue,
+    CreateApiKeyRequest,
+} from '@activepieces/ee-shared'
 import { securityAccess } from '@activepieces/server-shared'
 import {
     AP_MAXIMUM_PROFILE_PICTURE_SIZE,
@@ -8,11 +13,13 @@ import {
     isNil,
     PrincipalType,
     PROFILE_PICTURE_ALLOWED_TYPES,
+    SeekPage,
     UpdateMeResponse,
     UserWithBadges,
 } from '@activepieces/shared'
 import { FastifyPluginAsyncTypebox, Type } from '@fastify/type-provider-typebox'
 import { StatusCodes } from 'http-status-codes'
+import { apiKeyService } from '../api-keys/api-key-service'
 import { userIdentityService } from '../../authentication/user-identity/user-identity-service'
 import { fileService } from '../../file/file.service'
 import { userService } from '../../user/user-service'
@@ -55,6 +62,42 @@ export const usersController: FastifyPluginAsyncTypebox = async (app) => {
         await userIdentityService(app.log).update(identityId, { imageUrl: null })
 
         return { success: true }
+    })
+
+    app.post('/me/api-keys', CreateUserApiKeyRequest, async (req, res) => {
+        const platformId = req.principal.platform.id
+        assertNotNullOrUndefined(platformId, 'platformId')
+
+        const newApiKey = await apiKeyService.add({
+            platformId,
+            userId: req.principal.id,
+            displayName: req.body.displayName,
+        })
+
+        return res.status(StatusCodes.CREATED).send(newApiKey)
+    })
+
+    app.get('/me/api-keys', ListUserApiKeysRequest, async (req) => {
+        const platformId = req.principal.platform.id
+        assertNotNullOrUndefined(platformId, 'platformId')
+
+        return apiKeyService.list({
+            platformId,
+            userId: req.principal.id,
+        })
+    })
+
+    app.delete('/me/api-keys/:id', DeleteUserApiKeyRequest, async (req, res) => {
+        const platformId = req.principal.platform.id
+        assertNotNullOrUndefined(platformId, 'platformId')
+
+        await apiKeyService.delete({
+            id: req.params.id,
+            platformId,
+            userId: req.principal.id,
+        })
+
+        return res.status(StatusCodes.OK).send()
     })
 
     // From Head: /:id routes second
@@ -125,5 +168,39 @@ const DeleteProfilePictureRequest = {
     },
     config: {
         security: securityAccess.publicPlatform([PrincipalType.USER]),
+    },
+}
+
+const ListUserApiKeysRequest = {
+    config: {
+        security: securityAccess.publicPlatform([PrincipalType.USER]),
+    },
+    schema: {
+        response: {
+            [StatusCodes.OK]: SeekPage(ApiKeyResponseWithoutValue),
+        },
+    },
+}
+
+const CreateUserApiKeyRequest = {
+    config: {
+        security: securityAccess.publicPlatform([PrincipalType.USER]),
+    },
+    schema: {
+        body: CreateApiKeyRequest,
+        response: {
+            [StatusCodes.CREATED]: ApiKeyResponseWithValue,
+        },
+    },
+}
+
+const DeleteUserApiKeyRequest = {
+    config: {
+        security: securityAccess.publicPlatform([PrincipalType.USER]),
+    },
+    schema: {
+        params: Type.Object({
+            id: ApId,
+        }),
     },
 }

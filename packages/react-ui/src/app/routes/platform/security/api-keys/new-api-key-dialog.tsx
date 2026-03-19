@@ -24,11 +24,17 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { apiKeyApi } from '@/features/platform-admin/lib/api-key-api';
-import { ApiKeyResponseWithValue } from '@activepieces/ee-shared';
+import {
+  ApiKeyResponseWithValue,
+  CreateApiKeyRequest,
+} from '@activepieces/ee-shared';
 
 type NewApiKeyDialogProps = {
   children: React.ReactNode;
   onCreate: () => void;
+  createApiKey?: (
+    request: CreateApiKeyRequest,
+  ) => Promise<ApiKeyResponseWithValue>;
 };
 const FormSchema = Type.Object({
   displayName: Type.String({
@@ -42,6 +48,7 @@ type FormSchema = Static<typeof FormSchema>;
 export const NewApiKeyDialog = ({
   children,
   onCreate,
+  createApiKey = apiKeyApi.create,
 }: NewApiKeyDialogProps) => {
   const [open, setOpen] = useState(false);
   const [apiKey, setApiKey] = useState<ApiKeyResponseWithValue | undefined>(
@@ -52,7 +59,7 @@ export const NewApiKeyDialog = ({
   });
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => apiKeyApi.create(form.getValues()),
+    mutationFn: (request: FormSchema) => createApiKey(request),
     onSuccess: (apiKey) => {
       setApiKey(apiKey);
       onCreate();
@@ -64,6 +71,9 @@ export const NewApiKeyDialog = ({
       open={open}
       onOpenChange={(open) => {
         setOpen(open);
+        if (!open) {
+          setApiKey(undefined);
+        }
         form.reset();
       }}
     >
@@ -113,7 +123,7 @@ export const NewApiKeyDialog = ({
           <Form {...form}>
             <form
               className="grid space-y-4"
-              onSubmit={form.handleSubmit(() => mutate())}
+              onSubmit={form.handleSubmit((values) => mutate(values))}
             >
               <FormField
                 control={form.control}

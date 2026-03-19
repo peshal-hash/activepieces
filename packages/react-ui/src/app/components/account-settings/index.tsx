@@ -25,6 +25,7 @@ import {
 
 import { DeleteAccount } from './delete-account';
 import LanguageToggle from './language-toggle';
+import { PersonalApiKeysSection } from './personal-api-keys';
 import ThemeToggle from './theme-toggle';
 
 export interface AccountSettingsDialogProps {
@@ -127,6 +128,9 @@ export function AccountSettingsDialog({
               <ThemeToggle />
               <LanguageToggle />
             </div>
+            <Separator />
+            <PersonalApiKeysSection open={open} />
+            <Separator />
             <DeleteAccount />
           </div>
         </ScrollArea>

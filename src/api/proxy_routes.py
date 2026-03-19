@@ -570,24 +570,29 @@ async def ap_proxy(request: Request, rest: str = ""):
 
 
     if token:
-        # Use .get() to handle cases where they might be missing or empty
-        try:
-            # Verify the token's signature and expiration, and decode it
-            payload = jwt.decode(
-                token,
-                config.JWT_SECRET_KEY,
-                algorithms=[config.JWT_ALGORITHM]
-            )
-            if cookie_pid==None:
-                cookie_pid = payload.get("projectId")
-            platform_object = payload.get("platform")
+        # sk- tokens are Activepieces platform API keys — not JWTs.
+        # Pass them straight through; the upstream backend verifies them.
+        if token.startswith("sk-"):
+            logger.info("--- Found Activepieces API key (sk-), bypassing JWT decode. ---")
+        else:
+            # Use .get() to handle cases where they might be missing or empty
+            try:
+                # Verify the token's signature and expiration, and decode it
+                payload = jwt.decode(
+                    token,
+                    config.JWT_SECRET_KEY,
+                    algorithms=[config.JWT_ALGORITHM]
+                )
+                if cookie_pid==None:
+                    cookie_pid = payload.get("projectId")
+                platform_object = payload.get("platform")
 
-            if platform_object and isinstance(platform_object, dict):
-                cookie_platform_id = platform_object.get("id")
-        except JWTError as e:
-            # This handles expired tokens, invalid signatures, etc.
-            logger.info(f"JWT decoding failed: {e}")
-            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+                if platform_object and isinstance(platform_object, dict):
+                    cookie_platform_id = platform_object.get("id")
+            except JWTError as e:
+                # This handles expired tokens, invalid signatures, etc.
+                logger.info(f"JWT decoding failed: {e}")
+                raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
 
     if token:
         headers["Authorization"] = f"Bearer {token}"

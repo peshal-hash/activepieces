@@ -1,5 +1,5 @@
 import { ApiKey } from '@activepieces/ee-shared'
-import { Platform } from '@activepieces/shared'
+import { Platform, User } from '@activepieces/shared'
 import { EntitySchema } from 'typeorm'
 import {
     ApIdSchema,
@@ -8,6 +8,7 @@ import {
 
 type ApiKeySchema = ApiKey & {
     platform: Platform
+    user?: User
 }
 
 export const ApiKeyEntity = new EntitySchema<ApiKeySchema>({
@@ -21,6 +22,10 @@ export const ApiKeyEntity = new EntitySchema<ApiKeySchema>({
         platformId: {
             ...ApIdSchema,
             nullable: false,
+        },
+        userId: {
+            ...ApIdSchema,
+            nullable: true,
         },
         hashedValue: {
             type: String,
@@ -46,6 +51,16 @@ export const ApiKeyEntity = new EntitySchema<ApiKeySchema>({
                 name: 'platformId',
                 referencedColumnName: 'id',
                 foreignKeyConstraintName: 'fk_api_key_platform_id',
+            },
+        },
+        user: {
+            type: 'many-to-one',
+            target: 'user',
+            onDelete: 'CASCADE',
+            joinColumn: {
+                name: 'userId',
+                referencedColumnName: 'id',
+                foreignKeyConstraintName: 'fk_api_key_user_id',
             },
         },
     },
