@@ -97,7 +97,7 @@ const ApiKeysPage = () => {
   return (
     <LockedFeatureGuard
       featureKey="API"
-      locked={!platform.plan.apiKeysEnabled}
+      locked={false}
       lockTitle={t('Enable API Keys')}
       lockDescription={t(
         'Create and manage API keys to access Activepieces APIs.',

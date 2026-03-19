@@ -149,7 +149,7 @@ export function PlatformSidebar() {
           to: '/platform/security/api-keys',
           label: t('API Keys'),
           icon: FileJson2,
-          locked: !platform.plan.apiKeysEnabled,
+          locked: false,
         },
       ],
     },

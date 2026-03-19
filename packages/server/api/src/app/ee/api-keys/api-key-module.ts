@@ -9,11 +9,9 @@ import {
     Type,
 } from '@fastify/type-provider-typebox'
 import { StatusCodes } from 'http-status-codes'
-import { platformMustHaveFeatureEnabled } from '../authentication/ee-authorization'
 import { apiKeyService } from './api-key-service'
 
 export const apiKeyModule: FastifyPluginAsyncTypebox = async (app) => {
-    app.addHook('preHandler', platformMustHaveFeatureEnabled((platform) => platform.plan.apiKeysEnabled))
     await app.register(apiKeyController, { prefix: '/v1/api-keys' })
 }
 
