@@ -123,7 +123,6 @@ export const AppSidebarHeader = () => {
                     <h1 className="flex-1 min-w-0 truncate font-semibold">
                       {platformDisplayName}
                     </h1>
-                    {/* ✅ removed ChevronsUpDown */}
                   </SidebarMenuButton>
                 </PlatformSwitcher>
               </div>

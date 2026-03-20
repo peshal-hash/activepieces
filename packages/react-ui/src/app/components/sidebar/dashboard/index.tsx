@@ -368,11 +368,11 @@ export function ProjectDashboardSidebar() {
                 )
               )}
             </div>
-            <SidebarFooter className="pb-4 flex-shrink-0">
-                <SidebarUser />
-            </SidebarFooter>
           </SidebarGroup>
         </SidebarContent>
+        <SidebarFooter className="pb-4" onClick={(e) => e.stopPropagation()}>
+          <SidebarUser />
+        </SidebarFooter>
       </Sidebar>
     )
   );
