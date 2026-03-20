@@ -2,7 +2,7 @@ import { t } from 'i18next';
 import { Link } from 'react-router-dom';
 
 import { useEmbedding } from '@/components/embed-provider';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   SidebarHeader,
@@ -27,6 +27,7 @@ export const AppSidebarHeader = () => {
   const { platform: currentPlatform } = platformHooks.useCurrentPlatform();
   const { checkAccess } = useAuthorization();
   const defaultRoute = determineDefaultRoute(checkAccess);
+  const platformDisplayName = currentPlatform?.name ?? branding.websiteName;
 
   if (!showSwitcher) {
     return (
@@ -35,31 +36,45 @@ export const AppSidebarHeader = () => {
         onClick={(e) => e.stopPropagation()}
       >
         <SidebarMenu className="w-full">
-          <SidebarMenuItem className="flex items-center justify-between gap-1 w-full">
-            <div className="flex items-center gap-1 w-full">
-              <Link to={defaultRoute} className="w-full">
-                <div
-                  className={cn(
-                    buttonVariants({ variant: 'ghost', size: 'icon' }),
-                    'w-full flex items-center justify-center h-9',
-                  )}
-                >
+          <SidebarMenuItem
+            className={cn(
+              'flex items-center gap-1',
+              state === 'collapsed' ? 'justify-center' : 'justify-between',
+            )}
+          >
+            {state === 'collapsed' ? (
+              <Link to={defaultRoute}>
+                <Button variant="ghost" size="icon">
                   <img
-                    src={
-                      state === 'collapsed'
-                        ? branding.logos.logoIconUrl
-                        : branding.logos.fullLogoUrl
-                    }
-                    alt={t('home')}
-                    className={cn(
-                      'object-contain',
-                      state === 'collapsed' ? 'h-5 w-5' : 'w-full h-9',
-                    )}
+                    src={branding.logos.logoIconUrl}
+                    alt={t('Home')}
+                    className="h-5 w-5 object-contain"
                     draggable={false}
                   />
-                </div>
+                </Button>
               </Link>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 w-full">
+                <Link to={defaultRoute}>
+                  <Button variant="ghost" size="icon">
+                    <img
+                      src={branding.logos.logoIconUrl}
+                      alt={t('Home')}
+                      className="h-5 w-5 object-contain"
+                      draggable={false}
+                    />
+                  </Button>
+                </Link>
+                <Separator orientation="vertical" className="h-4" />
+                <SidebarMenuButton asChild className="px-2 h-9 gap-3 flex-1 min-w-0">
+                  <Link to={defaultRoute}>
+                    <h1 className="flex-1 min-w-0 truncate font-semibold">
+                      {platformDisplayName}
+                    </h1>
+                  </Link>
+                </SidebarMenuButton>
+              </div>
+            )}
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -106,7 +121,7 @@ export const AppSidebarHeader = () => {
                 <PlatformSwitcher>
                   <SidebarMenuButton className="px-2 h-9 gap-3 flex-1 min-w-0">
                     <h1 className="flex-1 min-w-0 truncate font-semibold">
-                      {currentPlatform?.name}
+                      {platformDisplayName}
                     </h1>
                     {/* ✅ removed ChevronsUpDown */}
                   </SidebarMenuButton>
