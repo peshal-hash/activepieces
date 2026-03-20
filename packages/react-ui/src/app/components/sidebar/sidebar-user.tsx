@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { t } from 'i18next';
 import {
   ChevronsUpDown,
+  KeyRound,
   LogOut,
   Shield,
   UserCogIcon,
@@ -39,6 +40,7 @@ import {
   useIsPlatformAdmin,
   useAuthorization,
 } from '@/hooks/authorization-hooks';
+import { platformHooks } from '@/hooks/platform-hooks';
 import { userHooks } from '@/hooks/user-hooks';
 import { authenticationSession } from '@/lib/authentication-session';
 import { Permission } from '@activepieces/shared';
@@ -53,6 +55,7 @@ export function SidebarUser() {
   const { state } = useSidebar();
   const location = useLocation();
   const { data: user } = userHooks.useCurrentUser();
+  const { platform } = platformHooks.useCurrentPlatform();
   const queryClient = useQueryClient();
   const { reset } = useTelemetry();
   const { checkAccess } = useAuthorization();
@@ -89,7 +92,12 @@ export function SidebarUser() {
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="right" align="center">
-                  {user.firstName + ' ' + user.lastName}
+                  <div className="flex flex-col">
+                    <span>{user.firstName + ' ' + user.lastName}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {platform.name}
+                    </span>
+                  </div>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -138,6 +146,9 @@ export function SidebarUser() {
                     {user.firstName + ' ' + user.lastName}
                   </span>
                   <span className="truncate text-xs">{user.email}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {platform.name}
+                  </span>
                 </div>
               </div>
             </DropdownMenuLabel>
@@ -145,6 +156,10 @@ export function SidebarUser() {
             {!isInPlatformAdmin && <SidebarPlatformAdminButton />}
 
             <DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
+                <KeyRound className="w-4 h-4 mr-2" />
+                {t('API Keys')}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
                 <UserCogIcon className="w-4 h-4 mr-2" />
                 {t('Account Settings')}
