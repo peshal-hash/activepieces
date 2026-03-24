@@ -48,7 +48,19 @@ export const packageManager = (log: FastifyBaseLogger) => ({
             `--outfile ${outputFile}`,
         ]
         log.debug({ path, entryFile, outputFile, config }, '[PackageManager#build]')
-        return execPromise(`bun build ${config.join(' ')}`, { cwd: path })
+        // Use spawnWithKill (same as install) so stderr is captured in the thrown error object.
+        // execPromise's promisify wraps exec which discards stderr context on failure.
+        const { error, data } = await tryCatch(async () => spawnWithKill({
+            cmd: `bun build ${config.join(' ')}`,
+            options: { cwd: path },
+            printOutput: false,
+            timeoutMs: dayjs.duration(5, 'minutes').asMilliseconds(),
+        }))
+        if (error) {
+            log.error({ error }, '[PackageManager#build] Failed to compile code')
+            throw error
+        }
+        return data
     },
 
 })

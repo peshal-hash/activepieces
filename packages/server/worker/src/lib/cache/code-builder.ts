@@ -7,6 +7,45 @@ import { workerMachine } from '../utils/machine'
 import { cacheState, NO_SAVE_GUARD } from './cache-state'
 import { packageManager } from './package-manager'
 
+// Node.js built-in modules that should NOT be added as npm dependencies
+const NODE_BUILTIN_MODULES = new Set([
+    'assert', 'async_hooks', 'buffer', 'child_process', 'cluster', 'console',
+    'constants', 'crypto', 'dgram', 'diagnostics_channel', 'dns', 'domain',
+    'events', 'fs', 'http', 'http2', 'https', 'inspector', 'module', 'net',
+    'os', 'path', 'perf_hooks', 'process', 'punycode', 'querystring',
+    'readline', 'repl', 'stream', 'string_decoder', 'sys', 'timers', 'tls',
+    'trace_events', 'tty', 'url', 'util', 'v8', 'vm', 'wasi', 'worker_threads', 'zlib',
+])
+
+/**
+ * Extracts npm package names from import/require statements in TypeScript/JavaScript code.
+ * Filters out relative imports, absolute paths, and Node.js built-in modules.
+ */
+function extractPackageImports(code: string): string[] {
+    const importRegex = /(?:^|\n)\s*import\s+(?:.*?\s+from\s+)?['"]([^'"]+)['"]/g
+    const requireRegex = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+    const packages = new Set<string>()
+
+    const collectPkg = (specifier: string) => {
+        // Skip relative/absolute paths and node: protocol aliases
+        if (specifier.startsWith('.') || specifier.startsWith('/')) return
+        const withoutNodeProtocol = specifier.startsWith('node:') ? specifier.slice(5) : specifier
+        const rootPkg = specifier.startsWith('@')
+            ? specifier.split('/').slice(0, 2).join('/')
+            : specifier.split('/')[0]
+        const rootPkgNoProtocol = withoutNodeProtocol.split('/')[0]
+        if (!NODE_BUILTIN_MODULES.has(rootPkgNoProtocol)) {
+            packages.add(rootPkg)
+        }
+    }
+
+    let m: RegExpExecArray | null
+    while ((m = importRegex.exec(code)) !== null) collectPkg(m[1])
+    while ((m = requireRegex.exec(code)) !== null) collectPkg(m[1])
+
+    return Array.from(packages)
+}
+
 const TS_CONFIG_CONTENT = `
 
 {
@@ -87,7 +126,7 @@ export const codeBuilder = (log: FastifyBaseLogger) => ({
                 const startTime = performance.now()
                 await installDependencies({
                     path: codePath,
-                    packageJson: await getPackageJson(packageJson),
+                    packageJson: await getPackageJson(packageJson, code),
                     log,
                 })
                 log.info({
@@ -131,18 +170,31 @@ function isPackagesAllowed(): boolean {
 }
 
 
-async function getPackageJson(packageJson: string): Promise<string> {
+async function getPackageJson(packageJson: string, code: string): Promise<string> {
     const packagedAllowed = isPackagesAllowed()
     if (!packagedAllowed) {
         return '{"dependencies":{}}'
     }
     const { data: parsedPackageJson, error: parseError } = await tryCatch(() => JSON.parse(packageJson))
     const packageJsonObject = parseError ? {} : (parsedPackageJson as Record<string, unknown>)
+    const existingDeps = (packageJsonObject?.['dependencies'] ?? {}) as Record<string, string>
+
+    // Auto-detect packages imported in the code that are not yet listed in package.json.
+    // This prevents bun build from failing when the user omits packages from the UI panel.
+    const detectedImports = extractPackageImports(code)
+    const autoDeps: Record<string, string> = {}
+    for (const pkg of detectedImports) {
+        if (!existingDeps[pkg] && pkg !== '@types/node') {
+            autoDeps[pkg] = '*'
+        }
+    }
+
     return JSON.stringify({
         ...packageJsonObject,
         dependencies: {
             '@types/node': '18.17.1',
-            ...(packageJsonObject?.['dependencies'] ?? {}),
+            ...existingDeps,
+            ...autoDeps,
         },
     })
 }
@@ -177,11 +229,13 @@ const handleCompilationError = async ({
     codePath,
     error,
 }: HandleCompilationErrorParams): Promise<void> => {
-    const errorHasStdout =
-        typeof error === 'object' && error && 'stdout' in error
-    const stdoutError = errorHasStdout ? error.stdout : undefined
+    const isErrObj = typeof error === 'object' && error !== null
+    const stdoutError = isErrObj && 'stdout' in error ? String((error as Record<string, unknown>).stdout ?? '') : ''
+    const stderrError = isErrObj && 'stderr' in error ? String((error as Record<string, unknown>).stderr ?? '') : ''
     const genericError = `${error ?? 'error compiling'}`
-    const errorMessage = `Compilation Error ${stdoutError ?? genericError}`
+    // bun build writes errors to stderr; fall back to stdout then generic message
+    const detail = stderrError || stdoutError || genericError
+    const errorMessage = `Compilation Error \n${detail}`
 
     const invalidArtifactContent = INVALID_ARTIFACT_TEMPLATE.replace(
         INVALID_ARTIFACT_ERROR_PLACEHOLDER,
