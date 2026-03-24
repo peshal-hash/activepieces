@@ -44,6 +44,7 @@ export const packageManager = (log: FastifyBaseLogger) => ({
             '--target node',
             '--production',
             '--format cjs',
+            '--packages external',
             `--outfile ${outputFile}`,
         ]
         log.debug({ path, entryFile, outputFile, config }, '[PackageManager#build]')
