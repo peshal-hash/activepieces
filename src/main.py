@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api import proxy_routes # Import your routes
+from .api import proxy_routes,shhconnect_routes # Import your routes
 from .database import ActivepiecesDatabase
 from .core import config
 from .database_management import db_manager
@@ -18,6 +18,7 @@ app.add_middleware(
 )
 # Include the router from the api directory
 app.include_router(proxy_routes.router)
+app.include_router(shhconnect_routes.router)
 
 @app.on_event("startup")
 async def startup_event():
