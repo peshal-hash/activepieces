@@ -161,7 +161,7 @@ export const projectMemberService = (log: FastifyBaseLogger) => ({
 
         return projectRole
     },
-    async update(params: UpdateMemberRole): Promise<ProjectMember> {
+    async update(params: UpdateMemberRole): Promise<ProjectMemberWithUser> {
         const projectRole = await projectRoleService.getOneOrThrow({
             name: params.role,
             platformId: params.platformId,
@@ -188,11 +188,19 @@ export const projectMemberService = (log: FastifyBaseLogger) => ({
         }, {
             projectRoleId: projectRole.id,
         })
-        return {
+        const updatedMember: ProjectMember = {
             ...projectMember,
             projectRoleId: projectRole.id,
             updated: dayjs().toISOString(),
         }
+        const enriched = await enrichProjectMemberWithUser(updatedMember, log)
+        if (isNil(enriched)) {
+            throw new ActivepiecesError({
+                code: ErrorCode.ENTITY_NOT_FOUND,
+                params: { entityType: 'project_member', entityId: params.id, message: 'Project member not found after update' },
+            })
+        }
+        return enriched
     },
     async getIdsOfProjects({
         userId,
