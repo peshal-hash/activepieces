@@ -21,10 +21,10 @@
         "../../packages/ee/shared/src"
       ],
       "@activepieces/pieces-framework": [
-        "../../packages/pieces/community/framework/src"
+        "../../packages/pieces/community/framework/src/browser.ts"
       ],
       "@activepieces/pieces-common": [
-        "../../packages/pieces/community/common/src"
+        "../../packages/pieces/community/common/src/browser.ts"
       ],
       "ee-embed-sdk": [
         "../../packages/ee/ui/embed-sdk/src"

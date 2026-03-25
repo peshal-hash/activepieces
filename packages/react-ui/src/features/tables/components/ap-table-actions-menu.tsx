@@ -21,6 +21,7 @@ import {
 import { PushToGitDialog } from '@/features/project-releases/components/push-to-git-dialog';
 import { gitSyncHooks } from '@/features/project-releases/lib/git-sync-hooks';
 import { useAuthorization } from '@/hooks/authorization-hooks';
+import { downloadFile } from '@/lib/utils';
 import { Permission, Table } from '@activepieces/shared';
 
 import { tablesApi } from '../lib/tables-api';
@@ -51,7 +52,6 @@ const ApTableActionsMenu = ({
 
   const exportTemplate = async () => {
     const tableTemplate = await tablesApi.getTemplate(table.id);
-    const { downloadFile } = await import('@/lib/utils');
     downloadFile({
       obj: JSON.stringify(tableTemplate, null, 2),
       fileName: tableTemplate.name,

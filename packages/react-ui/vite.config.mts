@@ -59,7 +59,11 @@ export default defineConfig(({ command, mode }) => {
         ),
         '@activepieces/pieces-framework': path.resolve(
           __dirname,
-          '../../packages/pieces/community/framework/src',
+          '../../packages/pieces/community/framework/src/browser.ts',
+        ),
+        '@activepieces/pieces-common': path.resolve(
+          __dirname,
+          '../../packages/pieces/community/common/src/browser.ts',
         ),
       },
     },
@@ -101,4 +105,3 @@ export default defineConfig(({ command, mode }) => {
     },
   };
 });
-

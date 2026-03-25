@@ -230,8 +230,9 @@ const handleCompilationError = async ({
     error,
 }: HandleCompilationErrorParams): Promise<void> => {
     const isErrObj = typeof error === 'object' && error !== null
-    const stdoutError = isErrObj && 'stdout' in error ? String((error as Record<string, unknown>).stdout ?? '') : ''
-    const stderrError = isErrObj && 'stderr' in error ? String((error as Record<string, unknown>).stderr ?? '') : ''
+    const errorRecord = isErrObj ? error as Record<string, unknown> : null
+    const stdoutError = errorRecord && 'stdout' in errorRecord ? String(errorRecord['stdout'] ?? '') : ''
+    const stderrError = errorRecord && 'stderr' in errorRecord ? String(errorRecord['stderr'] ?? '') : ''
     const genericError = `${error ?? 'error compiling'}`
     // bun build writes errors to stderr; fall back to stdout then generic message
     const detail = stderrError || stdoutError || genericError
