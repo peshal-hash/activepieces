@@ -10,8 +10,8 @@ ENV LANG=en_US.UTF-8 \
 # Install all system dependencies in a single layer with cache mounts
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
+    apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
+    apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
     openssh-client \
     python3 \
     python3-pip \
@@ -25,8 +25,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     locales-all \
     unzip \
     curl \
-    ca-certificates \
-    libcap-dev && \
+    ca-certificates && \
     yarn config set python /usr/bin/python3
 
 RUN export ARCH=$(uname -m) && \
@@ -86,8 +85,8 @@ WORKDIR /usr/src/app
 # Install Nginx and gettext in a single layer with cache mount
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && \
-    apt-get install -y --no-install-recommends nginx gettext
+    apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
+    apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends nginx gettext
 
 # Copy static configuration files first (better layer caching)
 COPY nginx.react.conf /etc/nginx/nginx.conf
