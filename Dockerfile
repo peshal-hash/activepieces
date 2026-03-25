@@ -111,6 +111,20 @@ COPY --from=build /usr/src/app/packages ./packages
 # Copy frontend files to Nginx document root
 COPY --from=build /usr/src/app/dist/packages/react-ui /usr/share/nginx/html/
 
+# Pre-install npm packages commonly needed in code execution steps.
+# Node.js walks up the directory tree looking for node_modules/, so packages
+# installed here at /usr/src/app/node_modules/ are found by any code step
+# running under /usr/src/app/cache/v7/codes/...
+# Uses the default hoisted linker (no --linker isolated) so packages are
+# placed directly in node_modules/<pkg>/ where Node.js standard resolution works.
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    mkdir -p /opt/step-preinstall && \
+    printf '{"dependencies":{"ssh2":"*","mssql":"*"}}' > /opt/step-preinstall/package.json && \
+    bun install --ignore-scripts --cwd /opt/step-preinstall && \
+    mkdir -p /usr/src/app/node_modules && \
+    cp -a /opt/step-preinstall/node_modules/. /usr/src/app/node_modules/ && \
+    rm -rf /opt/step-preinstall
+
 # --- Add Python Application ---
 WORKDIR /usr/src/app/python-app
 COPY app.py .
