@@ -1,6 +1,6 @@
 import asyncio
 import io
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from uuid import uuid4
 
 import paramiko
@@ -22,7 +22,7 @@ class SSHConnectRequest(BaseModel):
     private_key: str
     remote_bind_host: str
     remote_bind_port: int
-    private_key_passphrase: str | None = None
+    private_key_passphrase: Optional[str] = None
 
 
 class SQLConnectRequest(BaseModel):
