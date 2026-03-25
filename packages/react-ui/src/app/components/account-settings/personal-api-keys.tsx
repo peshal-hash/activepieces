@@ -76,7 +76,7 @@ export const PersonalApiKeysSection = ({
                     <div className="inline-flex items-center gap-1.5">
                       <Clock className="size-3.5" />
                       <span>{t('Created')}</span>
-                      <FormattedDate date={new Date(apiKey.createdAt ?? apiKey.created)} />
+                      <FormattedDate date={new Date(apiKey.created)} />
                     </div>
 
                     <div className="inline-flex items-center gap-1.5">
