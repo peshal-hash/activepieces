@@ -39,7 +39,7 @@ class SQLQueryRequest(BaseModel):
     query: str
 
 
-def load_private_key(private_key_str: str, passphrase: str | None = None):
+def load_private_key(private_key_str: str, passphrase: Optional[str] = None):
     key_io = io.StringIO(private_key_str)
 
     loaders = [
