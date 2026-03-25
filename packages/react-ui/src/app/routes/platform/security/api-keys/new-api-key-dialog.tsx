@@ -58,7 +58,7 @@ export const NewApiKeyDialog = ({
     resolver: typeboxResolver(FormSchema),
   });
 
-  const { mutate, isPending } = useMutation({
+  const { mutate, isPending } = useMutation<ApiKeyResponseWithValue, Error, FormSchema>({
     mutationFn: (request: FormSchema) => createApiKey(request),
     onSuccess: (apiKey) => {
       setApiKey(apiKey);

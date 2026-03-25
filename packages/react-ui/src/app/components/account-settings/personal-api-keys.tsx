@@ -17,7 +17,8 @@ export const PersonalApiKeysSection = ({
   open,
 }: PersonalApiKeysSectionProps) => {
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({
+
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['user-api-keys'],
     queryFn: () => userApiKeyApi.list(),
     enabled: open,
@@ -33,8 +34,9 @@ export const PersonalApiKeysSection = ({
             {t('Create and manage API keys to access Activepieces APIs.')}
           </div>
         </div>
+
         <NewApiKeyDialog
-          createApiKey={userApiKeyApi.create}
+          createApiKey={(request) => userApiKeyApi.create(request)}
           onCreate={() =>
             queryClient.invalidateQueries({ queryKey: ['user-api-keys'] })
           }
@@ -52,6 +54,10 @@ export const PersonalApiKeysSection = ({
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground">{t('Loading...')}</div>
+      ) : isError ? (
+        <div className="text-sm text-destructive">
+          {t('Failed to load API keys')}
+        </div>
       ) : data && data.data.length > 0 ? (
         <div className="space-y-2">
           {data.data.map((apiKey) => (
@@ -65,12 +71,14 @@ export const PersonalApiKeysSection = ({
                   <div className="text-xs text-muted-foreground font-mono">
                     {`sk-...${apiKey.truncatedValue}`}
                   </div>
+
                   <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                     <div className="inline-flex items-center gap-1.5">
                       <Clock className="size-3.5" />
                       <span>{t('Created')}</span>
-                      <FormattedDate date={new Date(apiKey.created)} />
+                      <FormattedDate date={new Date(apiKey.createdAt ?? apiKey.created)} />
                     </div>
+
                     <div className="inline-flex items-center gap-1.5">
                       <Clock className="size-3.5" />
                       <span>{t('Last Used')}</span>
@@ -82,6 +90,7 @@ export const PersonalApiKeysSection = ({
                     </div>
                   </div>
                 </div>
+
                 <ConfirmationDeleteDialog
                   title={t('Delete API Key')}
                   message={t('Are you sure you want to delete this API key?')}
@@ -111,9 +120,7 @@ export const PersonalApiKeysSection = ({
           </div>
           <div className="mt-3 text-sm font-medium">{t('No API keys found')}</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {t(
-              'Start by creating an API key to communicate with Activepieces APIs',
-            )}
+            {t('Start by creating an API key to communicate with Activepieces APIs')}
           </div>
         </div>
       )}

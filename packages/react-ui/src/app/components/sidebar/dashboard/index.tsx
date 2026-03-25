@@ -182,17 +182,7 @@ export function ProjectDashboardSidebar() {
     isSubItem: false,
   };
 
-  const platformAdminLink: SidebarItemType = {
-    type: 'link',
-    to: '/platform',
-    label: t('Platform Admin'),
-    show: true,
-    icon: Shield,
-    hasPermission: showPlatformAdmin && !embedState.isEmbedded,
-    isSubItem: false,
-  };
-
-  const items = [exploreLink, impactLink, platformAdminLink].filter(
+  const items = [exploreLink, impactLink].filter(
     permissionFilter,
   );
 

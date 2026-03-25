@@ -131,52 +131,13 @@ export function SidebarUser() {
             align="end"
             sideOffset={4}
           >
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <UserAvatar
-                  name={user.firstName + ' ' + user.lastName}
-                  email={user.email}
-                  imageUrl={user.imageUrl}
-                  size={32}
-                  disableTooltip={true}
-                />
-
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">
-                    {user.firstName + ' ' + user.lastName}
-                  </span>
-                  <span className="truncate text-xs">{user.email}</span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {platform.name}
-                  </span>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {!isInPlatformAdmin && <SidebarPlatformAdminButton />}
 
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
                 <KeyRound className="w-4 h-4 mr-2" />
                 {t('API Keys')}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setAccountSettingsOpen(true)}>
-                <UserCogIcon className="w-4 h-4 mr-2" />
-                {t('Account Settings')}
-              </DropdownMenuItem>
-              {canInviteUsers && (
-                <DropdownMenuItem onClick={() => setInviteUserOpen(true)}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  {t('Invite User')}
-                </DropdownMenuItem>
-              )}
-              <HelpAndFeedback />
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              {t('Log out')}
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
@@ -190,26 +151,3 @@ export function SidebarUser() {
   );
 }
 
-function SidebarPlatformAdminButton() {
-  const showPlatformAdminDashboard = useIsPlatformAdmin();
-  const { embedState } = useEmbedding();
-  const navigate = useNavigate();
-
-  if (embedState.isEmbedded || !showPlatformAdminDashboard) {
-    return null;
-  }
-
-  return (
-    <DropdownMenuGroup>
-      <DropdownMenuItem
-        onClick={() => navigate('/platform/projects')}
-        className="w-full flex items-center justify-center relative"
-      >
-        <div className={`w-full flex items-center gap-2`}>
-          <Shield className="size-4" />
-          <span className={`text-sm`}>{t('Platform Admin')}</span>
-        </div>
-      </DropdownMenuItem>
-    </DropdownMenuGroup>
-  );
-}
