@@ -69,6 +69,10 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 # Copy source code after dependency installation
 COPY . .
 
+# Install packages added to package.json but not yet in bun.lock
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun add @fastify/swagger-ui@5.2.5
+
 # Build both projects (already has NX_NO_CLOUD from base stage)
 RUN npx nx run-many --target=build --projects=react-ui,server-api --configuration production --parallel=2 --skip-nx-cache
 
