@@ -1,6 +1,6 @@
 import asyncio
 import io
-from typing import Dict
+from typing import Dict, Optional
 from uuid import uuid4
 
 import paramiko
@@ -13,7 +13,6 @@ router = APIRouter(prefix="/db-proxy", tags=["db-proxy"])
 
 SSH_TUNNELS: Dict[str, SSHTunnelForwarder] = {}
 SQL_CONNECTIONS: Dict[str, pyodbc.Connection] = {}
-
 
 
 class SSHConnectRequest(BaseModel):
@@ -61,16 +60,17 @@ def load_private_key(private_key_str: str, passphrase: Optional[str] = None):
 
 @router.post("/ssh/connect")
 async def ssh_connect(payload: SSHConnectRequest):
-    try:
-        pkey = load_private_key(payload.private_key, payload.private_key_passphrase)
+    # Called outside try/except so its 400 HTTPException propagates correctly
+    pkey = load_private_key(payload.private_key, payload.private_key_passphrase)
 
+    try:
         tunnel = SSHTunnelForwarder(
             (payload.ssh_host, payload.ssh_port),
             ssh_username=payload.ssh_user,
             ssh_pkey=pkey,
             remote_bind_address=(payload.remote_bind_host, payload.remote_bind_port),
         )
-        tunnel.start()
+        await asyncio.to_thread(tunnel.start)
 
         tunnel_id = str(uuid4())
         SSH_TUNNELS[tunnel_id] = tunnel
@@ -164,7 +164,7 @@ async def ssh_disconnect(tunnel_id: str):
         raise HTTPException(status_code=404, detail="SSH tunnel not found")
 
     try:
-        tunnel.stop()
+        await asyncio.to_thread(tunnel.stop)
         return {"success": True, "message": "SSH tunnel closed"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to close SSH tunnel: {str(e)}")
