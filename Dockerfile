@@ -86,11 +86,24 @@ FROM base AS run
 
 WORKDIR /usr/src/app
 
-# Install Nginx and gettext in a single layer with cache mount
+# Install Nginx, gettext, unixODBC, and Microsoft SQL Server ODBC Driver 18
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
-    apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends nginx gettext unixodbc
+    apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
+    nginx \
+    gettext \
+    unixodbc \
+    unixodbc-dev \
+    gnupg \
+    apt-transport-https \
+    libgssapi-krb5-2 && \
+    curl -sSL https://packages.microsoft.com/config/debian/11/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb && \
+    dpkg -i /tmp/packages-microsoft-prod.deb && \
+    rm /tmp/packages-microsoft-prod.deb && \
+    apt-get update && \
+    ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy static configuration files first (better layer caching)
 COPY nginx.react.conf /etc/nginx/nginx.conf
@@ -128,11 +141,7 @@ COPY docker-entrypoint.sh .
 RUN chmod +x docker-entrypoint.sh
 ENTRYPOINT ["./docker-entrypoint.sh"]
 
-# --- CHANGE IS HERE ---
-# Expose only port 5000 for the main application
 EXPOSE 5000
 
-# --- CHANGE IS HERE ---
-# Update the health check to target port 5000
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
     CMD curl -fsS http://127.0.0.1:5000/ || exit 1
