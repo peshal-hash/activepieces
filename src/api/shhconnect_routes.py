@@ -4,6 +4,17 @@ from typing import Dict, Optional
 from uuid import uuid4
 
 import paramiko
+
+# Compat shim: paramiko >= 3.0 removed DSSKey; sshtunnel still references it at runtime.
+if not hasattr(paramiko, "DSSKey"):
+    paramiko.DSSKey = type("DSSKey", (paramiko.PKey,), {
+        "get_name": lambda self: "ssh-dss",
+        "sign_ssh_data": lambda self, msg: b"",
+        "verify_ssh_sig": lambda self, msg, sig: False,
+        "_from_private_key": classmethod(lambda cls, file_obj, password: None),
+        "_from_public_key": classmethod(lambda cls, msg: None),
+    })
+
 import pyodbc
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
