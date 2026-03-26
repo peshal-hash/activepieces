@@ -120,14 +120,7 @@ export function AccountSettingsDialog({
               </div>
             </div>
 
-            <UserBadges user={user as UserWithBadges | null} />
 
-            <Separator />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ThemeToggle />
-              <LanguageToggle />
-            </div>
             <Separator />
             <PersonalApiKeysSection open={open} />
             <Separator />
