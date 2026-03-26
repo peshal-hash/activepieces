@@ -8,7 +8,8 @@ python-dotenv
 websockets>=11.0
 python-socketio
 python-jose[cryptography]
-paramiko
-sshtunnel
 pyodbc
 psycopg2-binary
+
+paramiko==3.5.1
+sshtunnel==0.4.0
