@@ -17,7 +17,7 @@ env:
   AZURE_ENVIRONMENT_NAME: testAPContainerEnvironment
   AZURE_LOCATION: canadacentral
   AZURE_KEY_VAULT_NAME: salesopt-kv-test
-  APP_NAME_ACTIVEPIECES: agentops-prod
+  APP_NAME_ACTIVEPIECES: agentops
   PYTHON_VERSION: '3.11'
 
 jobs:
