@@ -1,18 +1,19 @@
 import asyncio
 import io
-from typing import Dict, Any, Optional
+from typing import Dict
 from uuid import uuid4
 
 import paramiko
 import pyodbc
-from sshtunnel import SSHTunnelForwarder
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from sshtunnel import SSHTunnelForwarder
 
-router = APIRouter()
+router = APIRouter(prefix="/db-proxy", tags=["db-proxy"])
 
 SSH_TUNNELS: Dict[str, SSHTunnelForwarder] = {}
 SQL_CONNECTIONS: Dict[str, pyodbc.Connection] = {}
+
 
 
 class SSHConnectRequest(BaseModel):
