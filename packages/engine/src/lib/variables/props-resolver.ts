@@ -194,11 +194,12 @@ function parseSquareBracketConnectionPath(variableName: string): string | null {
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 async function evalInScope(js: string, contextAsScope: Record<string, unknown>, functions: Record<string, Function>): Promise<unknown> {
+    const safeJs = toSafeExpression(js)
     const { data: result, error: resultError } = await utils.tryCatchAndThrowOnEngineError((async () => {
         const codeSandbox = await initCodeSandbox()
 
         const result = await codeSandbox.runScript({
-            script: js,
+            script: safeJs,
             scriptContext: contextAsScope,
             functions,
         })
@@ -206,10 +207,22 @@ async function evalInScope(js: string, contextAsScope: Record<string, unknown>, 
     }))
 
     if (resultError) {
-        console.warn('[evalInScope] Error evaluating variable', resultError)
+        console.warn('[evalInScope] Error evaluating expression "' + js + '"', resultError)
         return ''
     }
     return result ?? ''
+}
+
+function toSafeExpression(js: string): string {
+    return js
+        // Replace .property with ?.property when preceded by identifier, ), or ]
+        // This leaves number literals like 3.14 alone (digit before dot not in class)
+        .replace(/([a-zA-Z_$\)\]])\./g, '$1?.')
+        // Replace [index] with ?.[index] to safely handle bracket access on undefined
+        .replace(/([a-zA-Z_$0-9\]\)])\[/g, '$1?.[')
+        // Make method calls optional too: ?.method( → ?.method?.(
+        // so that undefined methods return undefined instead of throwing
+        .replace(/(\?\.[a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g, '$1?.(')
 }
 
 function flattenNestedKeys(data: unknown, pathToMatch: string[]): unknown[] {
