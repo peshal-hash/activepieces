@@ -124,6 +124,14 @@ resource redisCache 'Microsoft.Cache/redis@2023-08-01' = if (deployNewInfrastruc
     minimumTlsVersion: '1.2'
   }
 }
+resource redisFirewallRule 'Microsoft.Cache/redis/firewallRules@2023-08-01' = if (deployNewInfrastructure) {
+  parent: redisCache
+  name: 'AllowAllWindowsAzureIps'
+  properties: {
+    startIP: '0.0.0.0'
+    endIP: '0.0.0.0'
+  }
+}
 // Unconditional reference for connection string construction
 resource existingPostgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' existing = {
   name: postgresServerName

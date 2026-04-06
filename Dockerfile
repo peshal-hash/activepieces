@@ -60,11 +60,11 @@ FROM base AS build
 WORKDIR /usr/src/app
 
 # Copy only dependency files first for better layer caching
-COPY .npmrc package.json bun.lock ./
+COPY .npmrc package.json ./
 
-# Install all dependencies with frozen lockfile
+# Install all dependencies
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile
+    bun install
 
 # Copy source code after dependency installation
 COPY . .

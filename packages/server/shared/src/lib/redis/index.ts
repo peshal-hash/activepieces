@@ -6,12 +6,12 @@ import { createMemoryRedisConnection } from './memory-redis'
 import { createSentinelRedisConnection } from './sentinel-redis'
 import { RedisConnectionSettings, RedisType } from './types'
 
-let redisConnectionInstance: Redis | null = null
-const mutexLock = new Mutex()
-
 export function redisConnectionFactory(
     settings: () => RedisConnectionSettings,
 ) {
+    let redisConnectionInstance: Redis | null = null
+    const mutexLock = new Mutex()
+
     const factory = {
         getRedisType(): RedisType {
             return settings().REDIS_TYPE as RedisType
