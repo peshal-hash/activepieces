@@ -310,7 +310,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'AP_WEBHOOK_TIMEOUT_SECONDS'
-              value: '30'
+              value: '300'
             }
             {
               name: 'AP_TRIGGER_DEFAULT_POLL_INTERVAL'
@@ -319,6 +319,10 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'AP_EXECUTION_MODE'
               value: 'UNSANDBOXED'
+            }
+            {
+              name: 'TIMEOUT'
+              value: '300'
             }
             {
               name: 'AP_FLOW_TIMEOUT_SECONDS'
