@@ -78,6 +78,11 @@ export const flowBackgroundJobs = (log: FastifyBaseLogger) => ({
                 await flowExecutionCache(log).invalidate(id)
 
             }
+            else {
+                await flowRepo().update(id, {
+                    operationStatus: FlowOperationStatus.NONE,
+                })
+            }
         })
 
 
