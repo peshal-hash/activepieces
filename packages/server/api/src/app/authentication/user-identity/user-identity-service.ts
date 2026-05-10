@@ -146,6 +146,24 @@ export const userIdentityService = (log: FastifyBaseLogger) => ({
     async update(id: string, params: UpdateParams): Promise<void> {
         await userIdentityRepository().update(id, params)
     },
+
+    async updateEmail(id: string, newEmail: string): Promise<void> {
+        const cleanedEmail = newEmail.toLowerCase().trim()
+        const existing = await userIdentityRepository().findOne({ where: { email: cleanedEmail } })
+        if (existing && existing.id !== id) {
+            throw new ActivepiecesError({
+                code: ErrorCode.EXISTING_USER,
+                params: {
+                    email: cleanedEmail,
+                    platformId: null,
+                },
+            })
+        }
+        await userIdentityRepository().update(id, {
+            email: cleanedEmail,
+            updated: new Date().toISOString(),
+        })
+    },
 })
 
 

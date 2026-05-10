@@ -8,6 +8,7 @@ export const UpdateUserRequestBody = Type.Object({
     status: Type.Optional(Type.Enum(UserStatus)),
     platformRole: Type.Optional(Type.Enum(PlatformRole)),
     externalId: Type.Optional(Type.String()),
+    email: Type.Optional(Type.String({ format: 'email' })),
 })
 
 export type UpdateUserRequestBody = Static<typeof UpdateUserRequestBody>
