@@ -118,7 +118,7 @@ resource redisCache 'Microsoft.Cache/redis@2023-08-01' = if (deployNewInfrastruc
     sku: {
       name: 'Basic'
       family: 'C'
-      capacity: 0
+      capacity: 1
     }
     enableNonSslPort: false
     minimumTlsVersion: '1.2'
@@ -227,7 +227,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'ap-main-app'
           resources: {
             cpu: json('2.0')
-            memory: '4.0Gi'
+            memory: '8.0Gi'
           }
           env: [
             {
