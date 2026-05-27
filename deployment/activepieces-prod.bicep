@@ -1,4 +1,3 @@
-
 param location string
 param salesoptapis string
 param environmentName string = 'testAPContainerEnvironment'
@@ -38,7 +37,6 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
   name: keyVaultName
 }
 
-
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: 'salesopt-container-identity'
 }
@@ -70,7 +68,6 @@ resource environment 'Microsoft.App/managedEnvironments@2023-05-01' = if (deploy
     }
   }
 }
-
 
 resource existingEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
   name: environmentName
@@ -165,6 +162,9 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
         external: true
         targetPort: 5000
         transport: 'auto'
+        stickySessions: {
+          affinity: 'none'
+        }
         corsPolicy: {
           allowedOrigins: [
             'https://gentle-grass-02d3f240f.1.azurestaticapps.net'
@@ -217,7 +217,6 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           identity: managedIdentity.id
         }
       ]
-
     }
     template: {
       revisionSuffix: revisionSuffix
@@ -227,7 +226,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'ap-main-app'
           resources: {
             cpu: json('2.0')
-            memory: '8.0Gi'
+            memory: '4.0Gi'
           }
           env: [
             {
@@ -400,8 +399,8 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
         }
       ]
       scale: {
-        minReplicas: 1
-        maxReplicas: 2
+        minReplicas: 2
+        maxReplicas: 5
         rules: [
           {
             name: 'http-scaling'
