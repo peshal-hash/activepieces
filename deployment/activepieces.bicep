@@ -1,4 +1,3 @@
-
 param location string
 param salesoptapis string
 param environmentName string = 'testAPContainerEnvironment'
@@ -38,7 +37,6 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
 resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
   name: keyVaultName
 }
-
 
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: 'salesopt-container-identity'
@@ -221,7 +219,6 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           identity: managedIdentity.id
         }
       ]
-
     }
     template: {
       revisionSuffix: revisionSuffix
@@ -322,7 +319,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'TIMEOUT'
-              value: '300'
+              value: '1200'
             }
             {
               name: 'AP_EXECUTION_MODE'

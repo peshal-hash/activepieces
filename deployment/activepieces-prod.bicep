@@ -321,7 +321,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'TIMEOUT'
-              value: '300'
+              value: '1200'
             }
             {
               name: 'AP_FLOW_TIMEOUT_SECONDS'

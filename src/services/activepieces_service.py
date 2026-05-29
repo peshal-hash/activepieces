@@ -4,6 +4,8 @@ from ..core import config
 # --- Configuration ---
 # This service is responsible for knowing the details of the Activepieces API.
 
+# Use a single session to pool connections to the backend
+_session = requests.Session()
 
 def sign_up(email: str, password: str, first_name: str, last_name: str) -> dict:
     """
@@ -31,7 +33,7 @@ def sign_up(email: str, password: str, first_name: str, last_name: str) -> dict:
         "trackEvents": True,
         "newsLetter": False,
     }
-    response = requests.post(url, json=payload, timeout=config.TIMEOUT)
+    response = _session.post(url, json=payload, timeout=config.TIMEOUT)
     response.raise_for_status()  # Raise an exception for 4xx or 5xx status codes
     return response.json()
 
@@ -52,12 +54,9 @@ def sign_in(email: str, password: str) -> dict:
     """
     url = f"{config.AP_BASE_URL}/api/v1/authentication/sign-in"
     payload = {"email": email, "password": password}
-    response = requests.post(url, json=payload, timeout=config.TIMEOUT)
+    response = _session.post(url, json=payload, timeout=config.TIMEOUT)
     response.raise_for_status()
     return response.json()
-
-
-import requests
 from typing import List, Dict
 from ..core import config  # adjust import
 
@@ -78,7 +77,7 @@ def list_projects(service_token: str, limit: int = 50) -> List[Dict]:
         if cursor:
             params["cursor"] = cursor
 
-        resp = requests.get(url, headers=headers, params=params, timeout=10)
+        resp = _session.get(url, headers=headers, params=params, timeout=10)
         resp.raise_for_status()
         page = resp.json()
 
@@ -101,7 +100,7 @@ def delete_project(project_id: str, service_token: str) -> None:
     headers = {"Authorization": f"Bearer {service_token}", "Accept": "application/json"}
 
     print(f"[delete_project] DELETE {url}")
-    r = requests.delete(url, headers=headers, timeout=10)
+    r = _session.delete(url, headers=headers, timeout=10)
     print(f"[delete_project] status={r.status_code} body={r.text!r}")
 
     # Only treat 204 as success
@@ -127,7 +126,7 @@ def delete_project(project_id: str, service_token: str) -> None:
 def delete_user(user_id: str, service_token: str) -> None:
     url = f"{API}/v1/users/{user_id}"
     headers = {"Authorization": f"Bearer {service_token}", "Accept": "application/json"}
-    resp = requests.delete(url, headers=headers, timeout=30)
+    resp = _session.delete(url, headers=headers, timeout=30)
     if resp.status_code == 404:
         return
     resp.raise_for_status()

@@ -44,12 +44,14 @@ class ActivepiecesDatabase:
         """Ensures the application-specific database exists in PostgreSQL."""
         # This method now connects to the default 'postgres' db on the correct server
         conn = self._get_connection(dbname="postgres")
-        conn.autocommit = True
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM pg_database WHERE datname=%s", (self.db_name,))
-            if cur.fetchone() is None:
-                cur.execute(f'CREATE DATABASE "{self.db_name}"')
-        conn.close()
+        try:
+            conn.autocommit = True
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM pg_database WHERE datname=%s", (self.db_name,))
+                if cur.fetchone() is None:
+                    cur.execute(f'CREATE DATABASE "{self.db_name}"')
+        finally:
+            conn.close()
 
     def get_db_connection(self):
         """Establishes a connection to the application database, creating it if it doesn't exist."""
@@ -64,20 +66,22 @@ class ActivepiecesDatabase:
     def setup_database(self):
         """Creates the UserInfo table if it doesn't already exist."""
         conn = self.get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS UserInfo (
-                    user_id TEXT PRIMARY KEY,
-                    email TEXT UNIQUE NOT NULL,
-                    first_name TEXT,
-                    last_name TEXT,
-                    auth_token TEXT NOT NULL,
-                    project_id TEXT NOT NULL,
-                    platform_id TEXT NOT NULL
-                )
-            """)
-        conn.commit()
-        conn.close()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS UserInfo (
+                        user_id TEXT PRIMARY KEY,
+                        email TEXT UNIQUE NOT NULL,
+                        first_name TEXT,
+                        last_name TEXT,
+                        auth_token TEXT NOT NULL,
+                        project_id TEXT NOT NULL,
+                        platform_id TEXT NOT NULL
+                    )
+                """)
+            conn.commit()
+        finally:
+            conn.close()
 
     def store_user_data(self, user_data: dict):
         """Inserts a new user or updates an existing user's data based on email."""

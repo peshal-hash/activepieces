@@ -34,6 +34,8 @@ logger = logging.getLogger("db_proxy")
 SSH_TUNNELS: Dict[str, SSHTunnelForwarder] = {}
 SQL_CONNECTIONS: Dict[str, pyodbc.Connection] = {}
 SQL_CONNECTION_TUNNELS: Dict[str, str] = {}
+CONNECTION_LAST_USED: Dict[str, datetime] = {}
+MAX_CONNECTIONS = 500
 
 
 class SSHConnectRequest(BaseModel):
@@ -126,8 +128,97 @@ def _build_conn_str(payload: SQLConnectRequest, local_port: int) -> str:
     )
 
 
+async def cleanup_idle_connections():
+    """Background task to close idle SSH/SQL connections."""
+    while True:
+        try:
+            await asyncio.sleep(60)
+            now = datetime.now()
+            to_remove_sql = []
+            to_remove_ssh = []
+
+            for cid, last_used in list(CONNECTION_LAST_USED.items()):
+                if cid in SQL_CONNECTIONS and (now - last_used).total_seconds() > 1800:
+                    to_remove_sql.append(cid)
+
+            for cid in to_remove_sql:
+                conn = SQL_CONNECTIONS.pop(cid, None)
+                SQL_CONNECTION_TUNNELS.pop(cid, None)
+                CONNECTION_LAST_USED.pop(cid, None)
+                if conn:
+                    try:
+                        await asyncio.to_thread(conn.close)
+                        logger.info("Closed idle SQL connection cid=%s", cid)
+                    except Exception:
+                        pass
+
+            # 2. Close idle SSH tunnels (no active SQL connections linked, idle for > 30 mins)
+            for tid, last_used in list(CONNECTION_LAST_USED.items()):
+                if tid in SSH_TUNNELS and (now - last_used).total_seconds() > 1800:
+                    # Check if any active SQL connections use this tunnel
+                    linked_sql = [cid for cid, t_id in SQL_CONNECTION_TUNNELS.items() if t_id == tid]
+                    if not linked_sql:
+                        to_remove_ssh.append(tid)
+
+            for tid in to_remove_ssh:
+                tunnel = SSH_TUNNELS.pop(tid, None)
+                CONNECTION_LAST_USED.pop(tid, None)
+                if tunnel:
+                    try:
+                        await asyncio.to_thread(tunnel.stop)
+                        logger.info("Closed idle SSH tunnel tid=%s", tid)
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.error("Error in cleanup_idle_connections: %s", e)
+
+# Keep track of the task to cancel it on shutdown
+_cleanup_task: Optional[asyncio.Task] = None
+
+@router.on_event("startup")
+async def startup_event():
+    global _cleanup_task
+    _cleanup_task = asyncio.create_task(cleanup_idle_connections())
+
+@router.on_event("shutdown")
+async def shutdown_event():
+    global _cleanup_task
+    if _cleanup_task:
+        _cleanup_task.cancel()
+
+    # Force close all connections
+    for cid, conn in list(SQL_CONNECTIONS.items()):
+        try:
+            conn.close()
+        except Exception:
+            pass
+    SQL_CONNECTIONS.clear()
+    SQL_CONNECTION_TUNNELS.clear()
+
+    for tid, tunnel in list(SSH_TUNNELS.items()):
+        try:
+            tunnel.stop()
+        except Exception:
+            pass
+    SSH_TUNNELS.clear()
+    CONNECTION_LAST_USED.clear()
+
+
 @router.post("/ssh/connect")
 async def ssh_connect(payload: SSHConnectRequest):
+    # LRU eviction if we exceed limits
+    if len(SSH_TUNNELS) >= MAX_CONNECTIONS:
+        # Find oldest tunnel
+        oldest_tid = min([t for t in SSH_TUNNELS.keys() if t in CONNECTION_LAST_USED],
+                         key=lambda x: CONNECTION_LAST_USED[x], default=None)
+        if oldest_tid:
+            try:
+                t = SSH_TUNNELS.pop(oldest_tid)
+                await asyncio.to_thread(t.stop)
+                CONNECTION_LAST_USED.pop(oldest_tid, None)
+            except Exception:
+                pass
+
     pkey = load_private_key(payload.private_key, payload.private_key_passphrase)
 
     try:
@@ -145,6 +236,7 @@ async def ssh_connect(payload: SSHConnectRequest):
 
         tunnel_id = str(uuid4())
         SSH_TUNNELS[tunnel_id] = tunnel
+        CONNECTION_LAST_USED[tunnel_id] = datetime.now()
 
         logger.info(
             "SSH tunnel established tunnel_id=%s local_port=%s remote=%s:%s",
@@ -210,6 +302,9 @@ async def sql_connect(payload: SQLConnectRequest):
         connection_id = str(uuid4())
         SQL_CONNECTIONS[connection_id] = conn
         SQL_CONNECTION_TUNNELS[connection_id] = payload.tunnel_id
+        CONNECTION_LAST_USED[connection_id] = datetime.now()
+        # Touch tunnel as well
+        CONNECTION_LAST_USED[payload.tunnel_id] = datetime.now()
 
         logger.info(
             "SQL connection established connection_id=%s tunnel_id=%s",
@@ -243,6 +338,11 @@ async def sql_query(payload: SQLQueryRequest):
     conn = SQL_CONNECTIONS.get(payload.connection_id)
     if not conn:
         raise HTTPException(status_code=404, detail="SQL connection not found")
+
+    CONNECTION_LAST_USED[payload.connection_id] = datetime.now()
+    tid = SQL_CONNECTION_TUNNELS.get(payload.connection_id)
+    if tid:
+        CONNECTION_LAST_USED[tid] = datetime.now()
 
     query = payload.query.strip()
     if not query:
@@ -287,6 +387,7 @@ async def sql_query(payload: SQLQueryRequest):
 async def sql_disconnect(connection_id: str):
     conn = SQL_CONNECTIONS.pop(connection_id, None)
     SQL_CONNECTION_TUNNELS.pop(connection_id, None)
+    CONNECTION_LAST_USED.pop(connection_id, None)
 
     if not conn:
         raise HTTPException(status_code=404, detail="SQL connection not found")
@@ -305,6 +406,7 @@ async def sql_disconnect(connection_id: str):
 @router.delete("/ssh/disconnect/{tunnel_id}")
 async def ssh_disconnect(tunnel_id: str):
     tunnel = SSH_TUNNELS.pop(tunnel_id, None)
+    CONNECTION_LAST_USED.pop(tunnel_id, None)
     if not tunnel:
         raise HTTPException(status_code=404, detail="SSH tunnel not found")
 
