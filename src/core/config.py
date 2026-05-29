@@ -18,10 +18,6 @@ DB_PORT: str = os.environ.get("AP_POSTGRES_PORT", "5432")
 # The base URL for the Activepieces instance you are proxying.
 AP_BASE_URL: str = os.environ.get("AP_BASE_URL", "http://localhost:80")
 
-# --- Application Configuration ---
-# The timeout for requests made to the Activepieces API.
-TIMEOUT: int = int(os.environ.get("TIMEOUT", 15))
-
 # CORS origins are loaded from the AP_SALESOPTAI_URLS variable in the .env file.
 # This can be a single URL or a comma-separated list of URLs.
 CORS_ORIGINS_STR: str = os.environ.get("AP_SALESOPTAI_URLS", "http://localhost:3000")
@@ -29,7 +25,7 @@ CORS_ORIGINS: list = [origin.strip() for origin in CORS_ORIGINS_STR.split(',')]
 #frontend url
 AP_FRONTEND_URL:str=os.environ.get("AP_FRONTEND_URL", "http://localhost:5000")
 AP_PROXY_URL:str=os.environ.get("AP_PROXY_URL", "http://localhost:5000")
-TIMEOUT = int(os.getenv("TIMEOUT", "30"))
+TIMEOUT = int(os.getenv("TIMEOUT", "1200"))
 
 
 # --- NEW: JWT Configuration ---

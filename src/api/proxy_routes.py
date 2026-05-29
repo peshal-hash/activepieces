@@ -23,6 +23,23 @@ import  logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Shared HTTP Clients to prevent connection leaks
+_shared_httpx_client: Optional[httpx.AsyncClient] = None
+_shared_requests_session: Optional[requests.Session] = None
+
+@router.on_event("startup")
+async def startup_event():
+    global _shared_httpx_client, _shared_requests_session
+    _shared_httpx_client = httpx.AsyncClient(timeout=config.TIMEOUT, follow_redirects=True)
+    _shared_requests_session = requests.Session()
+
+@router.on_event("shutdown")
+async def shutdown_event():
+    global _shared_httpx_client, _shared_requests_session
+    if _shared_httpx_client:
+        await _shared_httpx_client.aclose()
+    if _shared_requests_session:
+        _shared_requests_session.close()
 
 
 PLAT_SEGMENT_RE = re.compile(
@@ -77,14 +94,23 @@ def url_rewrite(content, content_type: str, token_to_inject: Optional[str], proj
     upstream_origin = config.AP_BASE_URL
     proxy_origin = config.AP_PROXY_URL
 
-    content_str = None
-    if "text" in content_type or "javascript" in content_type or "json" in content_type:
-        try:
-            content_str = content.decode("utf-8")
-        except (UnicodeDecodeError, AttributeError):
-            content_str = content
+    if not isinstance(content, str) and not ("text" in content_type or "javascript" in content_type or "json" in content_type):
+        return content
 
-        if "html" in content_type and token_to_inject:
+    content_str = None
+    try:
+        content_str = content.decode("utf-8") if isinstance(content, bytes) else content
+    except (UnicodeDecodeError, AttributeError):
+        return content
+
+    if "html" in content_type and token_to_inject:
+        # Don't use BS4 if we can just string-replace; BS4 is heavy.
+        if "<body" in content_str:
+            token_js = json.dumps(token_to_inject)
+            pid_js = json.dumps(project_id_to_inject) if project_id_to_inject else "null"
+            script = f"<script>(function(){{try{{localStorage.setItem('token',{token_js});if({pid_js}!==null)localStorage.setItem('projectId',{pid_js});}}catch(e){{}}}}());</script>"
+            content_str = re.sub(r'(<body[^>]*>)', r'\1' + script, content_str, count=1, flags=re.IGNORECASE)
+        else:
             soup = BeautifulSoup(content_str, "html.parser")
             body = soup.find("body")
             if body:
@@ -105,12 +131,12 @@ def url_rewrite(content, content_type: str, token_to_inject: Optional[str], proj
                 body.insert(0, script_tag)
                 content_str = str(soup)
 
-        if isinstance(content_str, str) and upstream_origin and proxy_origin:
-            content_str = content_str.replace(upstream_origin.rstrip("/"), proxy_origin.rstrip("/"))
+    if isinstance(content_str, str) and upstream_origin and proxy_origin:
+        upstream_stripped = upstream_origin.rstrip("/")
+        if upstream_stripped in content_str:
+            content_str = content_str.replace(upstream_stripped, proxy_origin.rstrip("/"))
 
-        return content_str
-
-    return content
+    return content_str
 
 
 def _is_https(request: Request) -> bool:
@@ -310,16 +336,15 @@ async def v1_webhook_handler(request: Request, rest_of_path: str):
 
     full_url = f"{config.AP_BASE_URL.rstrip('/')}/api/v1/webhooks/{rest_of_path}"
     try:
-        async with httpx.AsyncClient(timeout=1200) as client:
-            resp = await client.request(
-                method=request.method,
-                url=full_url,
-                headers=headers,
-                params=(q_params or None),          # <- None when empty to avoid "?"
-                content=body,
-            )
-            logger.info(f"response {resp}")
-            logger.info(f"{resp.content}")
+        client = _shared_httpx_client or httpx.AsyncClient(timeout=config.TIMEOUT, follow_redirects=True)
+        resp = await client.request(
+            method=request.method,
+            url=full_url,
+            headers=headers,
+            params=(q_params or None),          # <- None when empty to avoid "?"
+            content=body,
+            timeout=config.TIMEOUT
+        )
     except httpx.RequestError as e:
         return Response(content=f"Proxy connection error on webhook: {e}", status_code=502)
 
@@ -357,9 +382,10 @@ async def websocket_proxy(websocket: WebSocket, rest: str):
             origin=origin,
             open_timeout=20,
             close_timeout=20,
-            max_size=None,
-            max_queue=None,
-            ping_interval=None,  # Engine.IO handles keepalive
+            max_size=50 * 1024 * 1024, # Cap message size at 50MB
+            max_queue=32,              # Add backpressure to the queue
+            ping_interval=20,          # Ensure dead connections are reaped
+            ping_timeout=20
         ) as upstream_ws:
 
             async def pump_to_upstream():
@@ -449,8 +475,8 @@ async def proxy_ap_docs(request: Request, rest: str = ""):
     if qs:
         full_url = f"{full_url}?{qs}"
     try:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            resp = await client.get(full_url, headers={"host": "localhost"})
+        client = _shared_httpx_client or httpx.AsyncClient(timeout=config.TIMEOUT, follow_redirects=True)
+        resp = await client.get(full_url, headers={"host": "localhost"})
         excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
         out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
         return Response(content=resp.content, status_code=resp.status_code, headers=out_headers)
@@ -470,8 +496,8 @@ async def proxy_ap_openapi_json(request: Request, rest: str = ""):
     if qs:
         full_url = f"{full_url}?{qs}"
     try:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            resp = await client.get(full_url, headers={"host": "localhost"})
+        client = _shared_httpx_client or httpx.AsyncClient(timeout=30, follow_redirects=True)
+        resp = await client.get(full_url, headers={"host": "localhost"})
         excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
         out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
         return Response(content=resp.content, status_code=resp.status_code, headers=out_headers)
@@ -500,9 +526,8 @@ async def proxy_static_assets(request: Request, rest: str):
         except JWTError:
             pass
     try:
-        # Use httpx.AsyncClient for async requests
-        async with httpx.AsyncClient(timeout=config.TIMEOUT) as client:
-            resp = await client.get(full_url, headers=headers)
+        client = _shared_httpx_client or httpx.AsyncClient(timeout=config.TIMEOUT, follow_redirects=True)
+        resp = await client.get(full_url, headers=headers)
 
         content = url_rewrite(resp.content, resp.headers.get("Content-Type", ""), token, pid)
         excluded = {"content-encoding", "content-length", "transfer-encoding", "connection"}
@@ -659,29 +684,16 @@ async def ap_proxy(request: Request, rest: str = ""):
         q_params.pop("folderId", None)
 
     full_url = f"{config.AP_BASE_URL.rstrip('/')}/{rest.lstrip('/')}"
-    logger.info("****************************************************************************")
-    logger.info("these are the api and call made to general call")
-    logger.info(f"{request.url.path}")
-    logger.info(f"{rest}")
-    logger.info("this is full url")
-    logger.info(f"{full_url}")
-    logger.info("these are the parameters")
-    logger.info(q_params)
-
-    logger.info("*****************************************************************************")
 
     # Log without trailing '?' when there is no query
     qs = urlencode(q_params, doseq=True) if q_params else ""
     log_url = f"{full_url}{('?' + qs) if qs else ''}"
-    try:
-        logger.info(f"[UPSTREAM REQ] {request.method} {log_url}")
-    except Exception:
-        pass
 
     # Forward (params=None avoids adding a stray '?')
     try:
+        req_session = _shared_requests_session or requests
         resp = await asyncio.to_thread(
-            requests.request,
+            req_session.request,
             request.method,
             full_url,
             headers=headers,
