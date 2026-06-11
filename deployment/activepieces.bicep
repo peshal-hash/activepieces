@@ -318,6 +318,18 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               value: '5'
             }
             {
+              name: 'AP_WORKER_CONCURRENCY'
+              value: '2'
+            }
+            {
+              name: 'AP_SANDBOX_MEMORY_LIMIT'
+              value: '262144'
+            }
+            {
+              name: 'AP_PRE_WARM_CACHE'
+              value: 'false'
+            }
+            {
               name: 'TIMEOUT'
               value: '1200'
             }
