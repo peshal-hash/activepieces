@@ -176,11 +176,11 @@ export const fileService = (log: FastifyBaseLogger) => ({
     },
     async uploadPublicAsset(params: UploadPublicAssetParams): Promise<string | undefined> {
         const { file, type, platformId, allowedMimeTypes = IMAGE_MIME_TYPES, maxFileSizeInBytes, metadata } = params
-        
+
         if (isNil(file)) {
             return undefined
         }
-        
+
         if (!isMultipartFile(file)) {
             throw new ActivepiecesError({
                 code: ErrorCode.VALIDATION,

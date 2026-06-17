@@ -97,6 +97,7 @@ const getPinnedPieces = (
 };
 
 const POPULAR_PIECES_NAMES = [
+  '@activepieces/piece-nexopta-agent',
   '@activepieces/piece-google-sheets',
   '@activepieces/piece-slack',
   '@activepieces/piece-notion',

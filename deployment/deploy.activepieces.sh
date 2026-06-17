@@ -79,6 +79,7 @@ function deploy_infrastructure() {
       --parameters \
         location="$LOCATION" \
         salesoptapis="$SALESOPTAI_APIS" \
+        salesoptbackendapis="$AP_SALESOPTAI_BACKEND_APIS" \
         appImageTag="$IMAGE_TAG" \
         revisionSuffix="$REVISION_SUFFIX" \
         containerAppName="$APP_NAME_ACTIVEPIECES" \

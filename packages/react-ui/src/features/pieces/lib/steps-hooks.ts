@@ -57,16 +57,13 @@ export const stepsHooks = {
   useAllStepsMetadata: ({ searchQuery, type, enabled }: UseMetadataProps) => {
     const { i18n } = useTranslation();
 
-    // --- helper to identify "Agent" piece(s)
+    // --- helper to identify the built-in "Agent" piece we want to hide.
+    // Match ONLY Activepieces' own agent piece by exact package name. Do NOT match
+    // on a generic "agent" word: custom pieces such as @activepieces/piece-nexopta-agent
+    // ("NexOpta Agent") legitimately contain "agent" and must remain visible.
     const isAgentPiece = (piece: { name?: string; displayName?: string }) => {
       const name = (piece.name ?? '').toLowerCase();
-      const display = (piece.displayName ?? '').toLowerCase();
-      // hard block the official agent piece by package name, plus any that say "agent"
-      return (
-        name === '@activepieces/piece-agent' ||
-        /\bagents?\b/.test(name) ||
-        /\bagents?\b/.test(display)
-      );
+      return name === '@activepieces/piece-agent';
     };
 
     const query = useQuery<StepMetadataWithSuggestions[], Error>({
