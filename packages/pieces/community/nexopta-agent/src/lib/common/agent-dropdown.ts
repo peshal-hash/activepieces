@@ -1,6 +1,6 @@
 import { Property } from '@activepieces/pieces-framework';
 import { HttpMethod } from '@activepieces/pieces-common';
-import { makeRequest } from './client';
+import { makeRequest, SALESOPT_API_PATHS } from './client';
 import { salesOptAuth } from './auth';
 
 type SalesOptAgent = {
@@ -12,7 +12,7 @@ type SalesOptAgent = {
 
 /**
  * Dropdown that lists the SalesOpt agents the connected API key can manage.
- * Calls GET {backend}/api/agents and maps each agent to a selectable option.
+ * Calls GET {backend}/developer/agents and maps each agent to a selectable option.
  */
 export const agentIdDropdown = Property.Dropdown<string, true, typeof salesOptAuth>({
   auth: salesOptAuth,
@@ -33,7 +33,7 @@ export const agentIdDropdown = Property.Dropdown<string, true, typeof salesOptAu
       const agents = await makeRequest<SalesOptAgent[]>(
         auth.secret_text,
         HttpMethod.GET,
-        '/api/agents'
+        SALESOPT_API_PATHS.agents
       );
 
       if (!Array.isArray(agents)) {

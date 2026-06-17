@@ -1,6 +1,6 @@
 import { PieceAuth } from '@activepieces/pieces-framework';
 import { HttpMethod } from '@activepieces/pieces-common';
-import { makeRequest } from './client';
+import { makeRequest, SALESOPT_API_PATHS } from './client';
 
 export const salesOptAuth = PieceAuth.SecretText({
   displayName: 'SalesOpt API Key',
@@ -15,12 +15,18 @@ The backend URL is configured on the server via the
   required: true,
   validate: async ({ auth }) => {
     try {
-      await makeRequest(auth as string, HttpMethod.GET, '/api/agents');
+      await makeRequest(
+        auth as string,
+        HttpMethod.GET,
+        SALESOPT_API_PATHS.agents
+      );
       return { valid: true };
     } catch (error: any) {
       return {
         valid: false,
-        error: 'Invalid API key, or the SalesOpt backend is not reachable.',
+        error:
+          error?.message ||
+          'Invalid API key, or the SalesOpt backend is not reachable.',
       };
     }
   },

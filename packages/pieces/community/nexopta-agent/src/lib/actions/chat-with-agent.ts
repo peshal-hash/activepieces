@@ -2,7 +2,7 @@ import { createAction, Property } from '@activepieces/pieces-framework';
 import { HttpMethod } from '@activepieces/pieces-common';
 import { salesOptAuth } from '../common/auth';
 import { agentIdDropdown } from '../common/agent-dropdown';
-import { makeRequest } from '../common/client';
+import { makeRequest, SALESOPT_API_PATHS } from '../common/client';
 
 export const chatWithAgent = createAction({
   auth: salesOptAuth,
@@ -36,7 +36,7 @@ export const chatWithAgent = createAction({
     return await makeRequest(
       auth.secret_text,
       HttpMethod.POST,
-      `/api/ws/${agentId}/chat`,
+      SALESOPT_API_PATHS.chat(agentId),
       {
         message,
         conversation_id: conversationId,

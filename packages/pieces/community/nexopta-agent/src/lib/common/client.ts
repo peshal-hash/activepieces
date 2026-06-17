@@ -9,6 +9,12 @@ import { HttpMethod, httpClient } from '@activepieces/pieces-common';
  */
 const BACKEND_URL_ENV_VAR = 'AP_SALESOPTAI_BACKEND_APIS';
 
+export const SALESOPT_API_PATHS = {
+  agents: '/developer/agents',
+  chat: (agentId: string) =>
+    `/developer/ws/${encodeURIComponent(agentId)}/chat`,
+};
+
 export function getBackendBaseUrl(): string {
   const raw = process.env[BACKEND_URL_ENV_VAR];
   if (!raw || raw.trim() === '') {
@@ -19,6 +25,28 @@ export function getBackendBaseUrl(): string {
   // Use the first URL if a comma-separated list is provided, and drop any
   // trailing slashes so paths can be appended cleanly.
   return raw.split(',')[0].trim().replace(/\/+$/, '');
+}
+
+function extractErrorDetail(error: any): string {
+  const response = error?.response ?? error?.errorMessage?.()?.response;
+  const status = response?.status;
+  const body = response?.body;
+
+  let detail: string | undefined;
+  if (typeof body === 'string') {
+    detail = body;
+  } else if (body && typeof body === 'object') {
+    detail =
+      typeof body.detail === 'string' ? body.detail : JSON.stringify(body);
+  }
+
+  if (status && detail) {
+    return `HTTP ${status}: ${detail}`;
+  }
+  if (status) {
+    return `HTTP ${status}`;
+  }
+  return error?.message || String(error);
 }
 
 export async function makeRequest<T = unknown>(
@@ -40,6 +68,6 @@ export async function makeRequest<T = unknown>(
     });
     return response.body;
   } catch (error: any) {
-    throw new Error(`SalesOpt API error: ${error?.message || String(error)}`);
+    throw new Error(`SalesOpt API error: ${extractErrorDetail(error)}`);
   }
 }
