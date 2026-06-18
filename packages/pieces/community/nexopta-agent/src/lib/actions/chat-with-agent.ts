@@ -4,6 +4,26 @@ import { salesOptAuth } from '../common/auth';
 import { agentIdDropdown } from '../common/agent-dropdown';
 import { makeRequest, SALESOPT_API_PATHS, getMediaType } from '../common/client';
 
+/** Shape of a single file the SalesOpt backend's ChatFilePayload expects. */
+type ChatFilePayload = {
+  filename: string;
+  media_type: string;
+  data: string;
+};
+
+/**
+ * Sentinel used as the `data` of the JSON field's example default value.
+ * Entries still carrying it are treated as the unedited template and skipped,
+ * so the example never gets sent as a real (and invalid) attachment.
+ */
+const BASE64_PLACEHOLDER = 'PASTE_BASE64_FILE_CONTENT_HERE';
+
+/** Strip a leading `data:<mime>;base64,` prefix if the caller included one. */
+function stripDataUriPrefix(data: string): string {
+  const match = /^data:([^;]+);base64,(.*)$/s.exec(data.trim());
+  return match ? match[2] : data.trim();
+}
+
 export const chatWithAgent = createAction({
   auth: salesOptAuth,
   name: 'chat_with_agent',
@@ -18,9 +38,9 @@ export const chatWithAgent = createAction({
       required: true,
     }),
     files: Property.Array({
-      displayName: 'Files',
+      displayName: 'Files (upload / attach)',
       description:
-        'Optional file attachments (images: PNG/JPEG/GIF/WEBP, documents: PDF/DOCX/TXT). Images require a vision-capable model.',
+        'Upload files directly or attach them from a previous step. Images: PNG/JPEG/GIF/WEBP (require a vision-capable model). Documents: PDF/DOCX/TXT (text is extracted).',
       required: false,
       properties: {
         file: Property.File({
@@ -29,6 +49,22 @@ export const chatWithAgent = createAction({
           required: true,
         }),
       },
+    }),
+    filesJson: Property.Json({
+      displayName: 'Files (base64 JSON)',
+      description:
+        'Alternative to uploading: an array of files as base64. ' +
+        '"filename" and "data" are required; "media_type" is optional ' +
+        '(inferred from the filename) and "data" may include a ' +
+        '"data:...;base64," prefix. See the example below for the exact shape.',
+      required: false,
+      defaultValue: [
+        {
+          filename: 'report.pdf',
+          media_type: 'application/pdf',
+          data: BASE64_PLACEHOLDER,
+        },
+      ],
     }),
     conversationId: Property.ShortText({
       displayName: 'Conversation ID',
@@ -46,17 +82,50 @@ export const chatWithAgent = createAction({
   async run({ auth, propsValue }) {
     const { agentId, message, conversationId, includeDetail } = propsValue;
 
-    const fileEntries = (propsValue.files as Array<{ file: ApFile }>) ?? [];
-    const files = fileEntries
-      .map((entry) => entry?.file)
-      .filter((file): file is ApFile => !!file)
-      .map((file) => ({
+    const files: ChatFilePayload[] = [];
+
+    // 1. Files uploaded / attached directly via the File picker.
+    const uploaded = (propsValue.files as Array<{ file: ApFile }>) ?? [];
+    for (const entry of uploaded) {
+      const file = entry?.file;
+      if (!file) continue;
+      files.push({
         filename: file.filename,
         media_type: getMediaType(file.filename, file.extension),
-        // ApFile.base64 returns the raw base64 content (no data: URI prefix),
+        // ApFile.base64 returns raw base64 content (no data: URI prefix),
         // which is exactly what the backend's ChatFilePayload expects.
         data: file.base64,
-      }));
+      });
+    }
+
+    // 2. Files supplied directly as base64 JSON.
+    const rawJson = propsValue.filesJson;
+    if (rawJson != null) {
+      const items = Array.isArray(rawJson) ? rawJson : [rawJson];
+      for (const item of items) {
+        const obj = item as Record<string, unknown>;
+        const filename = typeof obj?.['filename'] === 'string' ? obj['filename'] : '';
+        const data = typeof obj?.['data'] === 'string' ? obj['data'] : '';
+        // Skip the unedited example template so it isn't sent as a real file.
+        if (data === BASE64_PLACEHOLDER) {
+          continue;
+        }
+        if (!filename || !data) {
+          throw new Error(
+            'Each "Files (base64 JSON)" entry must include a non-empty "filename" and "data" (base64) field.'
+          );
+        }
+        const mediaType =
+          typeof obj['media_type'] === 'string' && obj['media_type']
+            ? (obj['media_type'] as string)
+            : getMediaType(filename);
+        files.push({
+          filename,
+          media_type: mediaType,
+          data: stripDataUriPrefix(data),
+        });
+      }
+    }
 
     return await makeRequest(
       auth.secret_text,
