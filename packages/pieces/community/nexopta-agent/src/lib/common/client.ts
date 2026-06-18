@@ -28,6 +28,32 @@ export const SALESOPT_API_PATHS = {
     `/developer/ws/${encodeURIComponent(agentId)}/chat`,
 };
 
+/**
+ * Maps common file extensions to MIME types so the SalesOpt backend can route
+ * an attachment to vision (images) or text extraction (documents). The backend
+ * also falls back to the filename extension, but supplying an accurate
+ * media_type ensures images are detected via ALLOWED_IMAGE_TYPES.
+ */
+const EXTENSION_MEDIA_TYPES: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  pdf: 'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  txt: 'text/plain',
+};
+
+export function getMediaType(filename: string, extension?: string): string {
+  const ext = (
+    extension ?? filename.split('.').pop() ?? ''
+  )
+    .toLowerCase()
+    .replace(/^\./, '');
+  return EXTENSION_MEDIA_TYPES[ext] ?? 'application/octet-stream';
+}
+
 export function getBackendBaseUrl(): string {
   const raw =
     process.env[BACKEND_URL_ENV_VAR] ||
