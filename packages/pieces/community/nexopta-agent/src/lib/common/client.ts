@@ -9,6 +9,19 @@ import { HttpMethod, httpClient } from '@activepieces/pieces-common';
  */
 const BACKEND_URL_ENV_VAR = 'AP_SALESOPTAI_BACKEND_APIS';
 
+type SalesOptErrorResponse = {
+  status?: number;
+  body?: unknown;
+};
+
+type SalesOptRequestError = {
+  message?: string;
+  response?: SalesOptErrorResponse;
+  errorMessage?: () => {
+    response?: SalesOptErrorResponse;
+  };
+};
+
 export const SALESOPT_API_PATHS = {
   agents: '/developer/agents',
   chat: (agentId: string) =>
@@ -16,10 +29,17 @@ export const SALESOPT_API_PATHS = {
 };
 
 export function getBackendBaseUrl(): string {
-  const raw = process.env[BACKEND_URL_ENV_VAR];
+  const raw =
+    process.env[BACKEND_URL_ENV_VAR] ||
+    process.env['SALESOPTAI_BACKEND_APIS'] ||
+    process.env['AP_SALESOPTAI_URLS'];
+
   if (!raw || raw.trim() === '') {
+    const keys = Object.keys(process.env).filter((k) => k.startsWith('AP_'));
     throw new Error(
-      `SalesOpt backend URL is not configured. Set the ${BACKEND_URL_ENV_VAR} environment variable on the Activepieces container.`
+      `SalesOpt backend URL is not configured. Set the ${BACKEND_URL_ENV_VAR} environment variable on the Activepieces container. ` +
+        `(Note: Ensure ${BACKEND_URL_ENV_VAR} is listed in AP_SANDBOX_PROPAGATED_ENV_VARS so the engine receives it. ` +
+        `Current propagated AP_* vars: ${keys.join(', ')})`
     );
   }
   // Use the first URL if a comma-separated list is provided, and drop any
@@ -27,8 +47,10 @@ export function getBackendBaseUrl(): string {
   return raw.split(',')[0].trim().replace(/\/+$/, '');
 }
 
-function extractErrorDetail(error: any): string {
-  const response = error?.response ?? error?.errorMessage?.()?.response;
+function extractErrorDetail(error: unknown): string {
+  const requestError = error as SalesOptRequestError;
+  const response =
+    requestError.response ?? requestError.errorMessage?.()?.response;
   const status = response?.status;
   const body = response?.body;
 
@@ -36,8 +58,11 @@ function extractErrorDetail(error: any): string {
   if (typeof body === 'string') {
     detail = body;
   } else if (body && typeof body === 'object') {
+    const bodyRecord = body as Record<string, unknown>;
     detail =
-      typeof body.detail === 'string' ? body.detail : JSON.stringify(body);
+      typeof bodyRecord['detail'] === 'string'
+        ? bodyRecord['detail']
+        : JSON.stringify(body);
   }
 
   if (status && detail) {
@@ -46,7 +71,7 @@ function extractErrorDetail(error: any): string {
   if (status) {
     return `HTTP ${status}`;
   }
-  return error?.message || String(error);
+  return error instanceof Error ? error.message : String(error);
 }
 
 export async function makeRequest<T = unknown>(
@@ -67,7 +92,7 @@ export async function makeRequest<T = unknown>(
       body,
     });
     return response.body;
-  } catch (error: any) {
+  } catch (error: unknown) {
     throw new Error(`SalesOpt API error: ${extractErrorDetail(error)}`);
   }
 }

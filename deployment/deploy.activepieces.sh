@@ -69,6 +69,11 @@ function build_and_push_image() {
 function deploy_infrastructure() {
     write_info "Starting Bicep deployment for ${ENVIRONMENT_NAME} environment..."
 
+    if [[ -z "${AP_SALESOPTAI_BACKEND_APIS:-}" ]]; then
+      write_error "AP_SALESOPTAI_BACKEND_APIS must be set for the NexOpta Agent piece."
+      exit 1
+    fi
+
     # Define secrets and keys directly in the script
     local POSTGRES_PASSWORD="SalesOptAi123"
 
@@ -173,4 +178,3 @@ function main() {
 }
 
 main
-

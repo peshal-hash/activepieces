@@ -21,11 +21,11 @@ The backend URL is configured on the server via the
         SALESOPT_API_PATHS.agents
       );
       return { valid: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         valid: false,
         error:
-          error?.message ||
+          (error instanceof Error ? error.message : undefined) ||
           'Invalid API key, or the SalesOpt backend is not reachable.',
       };
     }

@@ -62,10 +62,12 @@ export const agentIdDropdown = Property.Dropdown<string, true, typeof salesOptAu
               option !== undefined
           ),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         disabled: true,
-        placeholder: `Failed to load agents: ${error?.message || error}`,
+        placeholder: `Failed to load agents: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         options: [],
       };
     }
