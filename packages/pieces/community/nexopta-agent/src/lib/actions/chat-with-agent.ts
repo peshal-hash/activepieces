@@ -20,7 +20,7 @@ const BASE64_PLACEHOLDER = 'PASTE_BASE64_FILE_CONTENT_HERE';
 
 /** Strip a leading `data:<mime>;base64,` prefix if the caller included one. */
 function stripDataUriPrefix(data: string): string {
-  const match = /^data:([^;]+);base64,(.*)$/s.exec(data.trim());
+  const match = /^data:([^;]+);base64,([\s\S]*)$/.exec(data.trim());
   return match ? match[2] : data.trim();
 }
 
