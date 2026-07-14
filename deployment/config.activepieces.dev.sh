@@ -15,7 +15,7 @@ UNIQUE_ID=$(head -c 4 /dev/urandom | xxd -p)
 # App-specific name for the Activepieces container
 APP_NAME_ACTIVEPIECES="agentops-dev"
 # Names for your new Postgres and Redis resources
-POSTGRES_SERVER_NAME="salesopt-pg-server-dev-b7e59be4"
+POSTGRES_SERVER_NAME="salesopt-pg-server-dev"
 POSTGRES_ADMIN_USER="salesoptadmin"
 REDIS_CACHE_NAME="salesopt-redis-cache-dev-b7e59be4"
 SALESOPTAI_APIS="https://portal.salesoptai.com,https://portal.nexopta.com,https://portal.nexopta.ai,https://gentle-grass-02d3f240f.1.azurestaticapps.net,https://salesopt-app.redriver-d84691b9.eastus.azurecontainerapps.io,https://portal.salesopt.ai,https://salesoptai-app-prod.icystone-9246cdc7.canadaeast.azurecontainerapps.io"
