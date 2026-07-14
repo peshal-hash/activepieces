@@ -228,8 +228,8 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           image: '${acr.properties.loginServer}/${containerAppName}:${appImageTag}'
           name: 'ap-main-app'
           resources: {
-            cpu: json('2.0')
-            memory: '4.0Gi'
+            cpu: json('1.25')
+            memory: '2.5Gi'
           }
           env: [
             {
