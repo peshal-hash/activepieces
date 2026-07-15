@@ -19,5 +19,7 @@ POSTGRES_SERVER_NAME="salesopt-pg-server-prod"
 POSTGRES_ADMIN_USER="salesoptadmin"
 REDIS_CACHE_NAME="salesopt-redis-cache-prod"
 SALESOPTAI_APIS="https://portal.salesoptai.com,https://portal.nexopta.com,https://portal.nexopta.ai,https://gentle-grass-02d3f240f.1.azurestaticapps.net,https://salesopt-app.redriver-d84691b9.eastus.azurecontainerapps.io,https://portal.salesopt.ai,https://salesoptai-app-prod.icystone-9246cdc7.canadaeast.azurecontainerapps.io"
+# SalesOpt backend base URL exposed to the SalesOpt Agent piece (read from process.env).
+AP_SALESOPTAI_BACKEND_APIS="https://salesoptai-app-prod.icystone-9246cdc7.canadaeast.azurecontainerapps.io"
 #make sure we don't deploy any new infrastructure.
 DEPLOY_NEW_INFRA='false'

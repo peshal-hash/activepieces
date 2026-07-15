@@ -75,6 +75,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 
 # Build both projects (already has NX_NO_CLOUD from base stage)
 RUN npx nx run-many --target=build --projects=react-ui,server-api --configuration production --parallel=2 --skip-nx-cache
+RUN npx nx build pieces-nexopta-agent --skip-nx-cache
 
 # Install production dependencies only for the backend API
 RUN --mount=type=cache,target=/root/.bun/install/cache \
@@ -122,7 +123,17 @@ COPY --from=build /usr/src/app/LICENSE .
 COPY --from=build /usr/src/app/dist/packages/engine/ ./dist/packages/engine/
 COPY --from=build /usr/src/app/dist/packages/server/ ./dist/packages/server/
 COPY --from=build /usr/src/app/dist/packages/shared/ ./dist/packages/shared/
+COPY --from=build /usr/src/app/dist/packages/pieces/ ./dist/packages/pieces/
 COPY --from=build /usr/src/app/packages ./packages
+
+# AP_DEV_PIECES loads a piece by importing dist/packages/pieces/<piece>/src/index.js at
+# runtime. That import chain pulls in dist/packages/shared and the pieces framework, which
+# `require('tslib')` (and other npm deps) resolved relative to their own location. Without a
+# workspace-root node_modules these fail with "Cannot find module 'tslib'", the load throws,
+# and the piece is silently dropped from the catalog. Point the workspace-root node_modules at
+# the server's production node_modules (which contains tslib et al.) so Node's fallback
+# resolution from dist/packages/* finds them.
+RUN ln -sfn /usr/src/app/dist/packages/server/api/node_modules /usr/src/app/node_modules
 
 # Copy frontend files to Nginx document root
 COPY --from=build /usr/src/app/dist/packages/react-ui /usr/share/nginx/html/

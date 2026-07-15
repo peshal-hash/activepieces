@@ -1,5 +1,6 @@
 param location string
 param salesoptapis string
+param salesoptbackendapis string
 param environmentName string = 'testAPContainerEnvironment'
 param logAnalyticsWorkspaceName string = 'ap-logs-${uniqueString(resourceGroup().id)}'
 param acrName string = 'salesopttest'
@@ -227,8 +228,8 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           image: '${acr.properties.loginServer}/${containerAppName}:${appImageTag}'
           name: 'ap-main-app'
           resources: {
-            cpu: json('2.0')
-            memory: '4.0Gi'
+            cpu: json('1.25')
+            memory: '2.5Gi'
           }
           env: [
             {
@@ -396,6 +397,18 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'AP_SALESOPTAI_URLS'
               value: salesoptapis
+            }
+            {
+              name: 'AP_SALESOPTAI_BACKEND_APIS'
+              value: salesoptbackendapis
+            }
+            {
+              name: 'AP_SANDBOX_PROPAGATED_ENV_VARS'
+              value: 'AP_SALESOPTAI_BACKEND_APIS'
+            }
+            {
+              name: 'AP_DEV_PIECES'
+              value: 'nexopta-agent'
             }
             {
               name: 'AP_WEBSITE_NAME'
