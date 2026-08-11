@@ -1,0 +1,17 @@
+[install]
+# Do not run dependency lifecycle scripts (preinstall/install/postinstall).
+#
+# `redis-memory-server` is in Bun's default-trusted list, so without this its
+# postinstall runs and compiles Redis *from source* — including the RedisBloom,
+# RedisJSON, RediSearch and RedisTimeSeries modules. That needs cmake, rustc/cargo
+# and libssl-dev, none of which exist in the node:20-bullseye-slim base image, so
+# the Docker build dies at `bun install`.
+#
+# Nothing here needs an install-time build step: redis-memory-server is only
+# reached via REDIS_TYPE=MEMORY (packages/server/shared/src/lib/redis/index.ts),
+# a local-dev/test path. Every deployed environment sets AP_REDIS_TYPE=STANDALONE
+# and connects to a real Redis, so the compiled binaries are never used.
+#
+# If a dependency ever genuinely needs its lifecycle script, allow just that one
+# via `trustedDependencies` in package.json rather than flipping this back on.
+ignoreScripts = true

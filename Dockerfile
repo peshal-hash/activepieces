@@ -59,8 +59,10 @@ FROM base AS build
 
 WORKDIR /usr/src/app
 
-# Copy only dependency files first for better layer caching
-COPY .npmrc package.json ./
+# Copy only dependency files first for better layer caching.
+# bunfig.toml must be present before `bun install` — it is what stops
+# redis-memory-server's postinstall from compiling Redis from source.
+COPY .npmrc package.json bunfig.toml ./
 
 # Install all dependencies
 RUN --mount=type=cache,target=/root/.bun/install/cache \
@@ -78,9 +80,11 @@ RUN npx nx run-many --target=build --projects=react-ui,server-api --configuratio
 RUN npx nx build pieces-nexopta-agent --skip-nx-cache
 
 # Install production dependencies only for the backend API
+# --ignore-scripts: this runs in dist/, outside the reach of the root bunfig.toml,
+# so the flag is what keeps redis-memory-server from compiling Redis here too.
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     cd dist/packages/server/api && \
-    bun install --production --frozen-lockfile
+    bun install --production --frozen-lockfile --ignore-scripts
 
 # ------------ RUNTIME STAGE ------------
 FROM base AS run
