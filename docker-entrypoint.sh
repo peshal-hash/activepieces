@@ -27,9 +27,25 @@ echo "Starting Activepieces backend: $AP_ENTRY"
 node --enable-source-maps "$AP_ENTRY" &
 NODE_PID=$!
 
-sleep 1
-if ! kill -0 "$NODE_PID" 2>/dev/null; then
-  echo "Activepieces backend failed to start (entry: $AP_ENTRY)."
+echo "Waiting for Activepieces backend on :3000..."
+AP_READY=0
+i=1
+while [ "$i" -le 180 ]; do
+  if ! kill -0 "$NODE_PID" 2>/dev/null; then
+    echo "Activepieces backend died during startup (entry: $AP_ENTRY)."
+    exit 1
+  fi
+  if curl -fsS http://127.0.0.1:3000/v1/flags >/dev/null 2>&1; then
+    AP_READY=1
+    echo "Activepieces backend is ready after ${i}s."
+    break
+  fi
+  sleep 1
+  i=$((i + 1))
+done
+
+if [ "$AP_READY" -ne 1 ]; then
+  echo "Activepieces backend did not become ready within 180s (entry: $AP_ENTRY)."
   exit 1
 fi
 

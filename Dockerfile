@@ -59,9 +59,6 @@ FROM base AS build
 
 WORKDIR /usr/src/app
 
-# Copy only dependency files first for better layer caching.
-# bunfig.toml must be present before `bun install` — it is what stops
-# redis-memory-server's postinstall from compiling Redis from source.
 COPY .npmrc package.json bunfig.toml ./
 
 # Install all dependencies
@@ -158,5 +155,9 @@ ENTRYPOINT ["./docker-entrypoint.sh"]
 
 EXPOSE 5000
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
-    CMD curl -fsS http://127.0.0.1:5000/ || exit 1
+# Probe the Activepieces backend, not just the proxy. The proxy starts serving
+# well before Node is listening, so a check against :5000 alone reports healthy
+# while every proxied request still 502s.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=5 \
+    CMD curl -fsS http://127.0.0.1:5000/ >/dev/null 2>&1 \
+        && curl -fsS http://127.0.0.1:3000/v1/flags >/dev/null 2>&1 || exit 1
