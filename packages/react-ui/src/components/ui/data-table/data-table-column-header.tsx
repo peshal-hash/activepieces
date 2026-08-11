@@ -44,10 +44,14 @@ export function DataTableColumnHeader<TData, TValue>({
 
   return (
     <div
-      className={`flex items-center justify-start space-x-2 py-4 whitespace-nowrap ${className}`}
+      className={`flex items-center justify-start gap-2 py-4 min-w-0 ${className}`}
     >
-      {Icon && <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-      <div className="text-sm text-foreground">{title}</div>
+      {/* The icon costs ~24px of a column that may only be 70px wide on a
+          phone, so keep the label and drop the decoration. */}
+      {Icon && (
+        <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0 hidden md:block" />
+      )}
+      <div className="text-sm text-foreground truncate">{title}</div>
     </div>
   );
 }

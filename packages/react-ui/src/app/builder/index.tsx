@@ -1,3 +1,5 @@
+import { t } from 'i18next';
+import { X } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { useBuilderStateContext } from '@/app/builder/builder-hooks';
@@ -6,6 +8,7 @@ import { CanvasControls } from '@/app/builder/flow-canvas/canvas-controls';
 import { StepSettingsProvider } from '@/app/builder/step-settings/step-settings-context';
 import { ChatDrawer } from '@/app/routes/chat/chat-drawer';
 import { ShowPoweredBy } from '@/components/show-powered-by';
+import { Button } from '@/components/ui/button';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -13,6 +16,7 @@ import {
 } from '@/components/ui/resizable-panel';
 import { piecesHooks } from '@/features/pieces/lib/pieces-hooks';
 import { platformHooks } from '@/hooks/platform-hooks';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { RightSideBarType } from '@/lib/types';
 import {
   FlowAction,
@@ -43,9 +47,20 @@ const animateResizeClassName = `transition-all `;
 
 const BuilderPage = () => {
   const { platform } = platformHooks.useCurrentPlatform();
-  const [flowVersion, rightSidebar, selectedStep] = useBuilderStateContext(
-    (state) => [state.flowVersion, state.rightSidebar, state.selectedStep],
-  );
+  const isMobile = useIsMobile();
+  const [
+    flowVersion,
+    rightSidebar,
+    selectedStep,
+    exitStepSettings,
+    setRightSidebar,
+  ] = useBuilderStateContext((state) => [
+    state.flowVersion,
+    state.rightSidebar,
+    state.selectedStep,
+    state.exitStepSettings,
+    state.setRightSidebar,
+  ]);
   flowCanvasHooks.useShowBuilderIsSavingWarningBeforeLeaving();
   const { memorizedSelectedStep } = useBuilderStateContext((state) => {
     const flowVersion = state.flowVersion;
@@ -79,6 +94,30 @@ const BuilderPage = () => {
   flowCanvasHooks.useSetSocketListener(refetchPiece);
   const [hasCanvasBeenInitialised, setHasCanvasBeenInitialised] =
     useState(false);
+
+  // Shared by the desktop resizable panel and the mobile full-screen overlay.
+  const sidebarContent = (
+    <>
+      {rightSidebar === RightSideBarType.PIECE_SETTINGS &&
+        memorizedSelectedStep && (
+          <ResizableVerticalPanelsProvider>
+            <StepSettingsProvider
+              pieceModel={pieceModel}
+              selectedStep={memorizedSelectedStep}
+              key={constructContainerKey({
+                flowVersionId: flowVersion.id,
+                step: memorizedSelectedStep,
+                hasPieceModelLoaded: !!pieceModel,
+              })}
+            >
+              <StepSettingsContainer />
+            </StepSettingsProvider>
+          </ResizableVerticalPanelsProvider>
+        )}
+      {rightSidebar === RightSideBarType.RUNS && <RunsList />}
+      {rightSidebar === RightSideBarType.VERSIONS && <FlowVersionsList />}
+    </>
+  );
 
   return (
     <div className="flex h-full w-full flex-col relative">
@@ -118,54 +157,70 @@ const BuilderPage = () => {
           </div>
         </ResizablePanel>
 
-        <ResizableHandle
-          disabled={rightSidebar === RightSideBarType.NONE}
-          withHandle={rightSidebar !== RightSideBarType.NONE}
-          onDragging={setIsDraggingHandle}
-          className={
-            rightSidebar === RightSideBarType.NONE ? 'bg-transparent' : ''
-          }
-        />
+        {/* The sidebar has a 400px min-width, which does not fit beside the
+            canvas on a phone. Below the mobile breakpoint it becomes a
+            full-screen overlay instead of a resizable panel. */}
+        {!isMobile && (
+          <>
+            <ResizableHandle
+              disabled={rightSidebar === RightSideBarType.NONE}
+              withHandle={rightSidebar !== RightSideBarType.NONE}
+              onDragging={setIsDraggingHandle}
+              className={
+                rightSidebar === RightSideBarType.NONE ? 'bg-transparent' : ''
+              }
+            />
 
-        <ResizablePanel
-          ref={rightHandleRef}
-          id="right-sidebar"
-          defaultSize={0}
-          minSize={0}
-          maxSize={60}
-          order={3}
-          className={cn('min-w-0 bg-background z-30', {
-            [minWidthOfSidebar]: rightSidebar !== RightSideBarType.NONE,
-            [animateResizeClassName]: !isDraggingHandle,
-          })}
-          style={{
-            transitionDuration: `${
-              isDraggingHandle ? 0 : flowCanvasConsts.SIDEBAR_ANIMATION_DURATION
-            }ms`,
-          }}
-        >
-          <div ref={rightSidePanelRef} className="h-full w-full">
-            {rightSidebar === RightSideBarType.PIECE_SETTINGS &&
-              memorizedSelectedStep && (
-                <ResizableVerticalPanelsProvider>
-                  <StepSettingsProvider
-                    pieceModel={pieceModel}
-                    selectedStep={memorizedSelectedStep}
-                    key={constructContainerKey({
-                      flowVersionId: flowVersion.id,
-                      step: memorizedSelectedStep,
-                      hasPieceModelLoaded: !!pieceModel,
-                    })}
-                  >
-                    <StepSettingsContainer />
-                  </StepSettingsProvider>
-                </ResizableVerticalPanelsProvider>
-              )}
-            {rightSidebar === RightSideBarType.RUNS && <RunsList />}
-            {rightSidebar === RightSideBarType.VERSIONS && <FlowVersionsList />}
-          </div>
-        </ResizablePanel>
+            <ResizablePanel
+              ref={rightHandleRef}
+              id="right-sidebar"
+              defaultSize={0}
+              minSize={0}
+              maxSize={60}
+              order={3}
+              className={cn('min-w-0 bg-background z-30', {
+                [minWidthOfSidebar]: rightSidebar !== RightSideBarType.NONE,
+                [animateResizeClassName]: !isDraggingHandle,
+              })}
+              style={{
+                transitionDuration: `${
+                  isDraggingHandle
+                    ? 0
+                    : flowCanvasConsts.SIDEBAR_ANIMATION_DURATION
+                }ms`,
+              }}
+            >
+              <div ref={rightSidePanelRef} className="h-full w-full">
+                {sidebarContent}
+              </div>
+            </ResizablePanel>
+          </>
+        )}
       </ResizablePanelGroup>
+
+      {isMobile && rightSidebar !== RightSideBarType.NONE && (
+        <div className="absolute inset-0 z-40 bg-background flex flex-col">
+          <div className="flex items-center justify-end border-b px-2 py-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t('Close')}
+              onClick={() => {
+                // Runs/Versions are just panels — only step settings owns a
+                // step selection that needs clearing.
+                if (rightSidebar === RightSideBarType.PIECE_SETTINGS) {
+                  exitStepSettings();
+                } else {
+                  setRightSidebar(RightSideBarType.NONE);
+                }
+              }}
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
+          <div className="flex-1 min-h-0">{sidebarContent}</div>
+        </div>
+      )}
 
       <ChatDrawer />
     </div>

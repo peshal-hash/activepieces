@@ -16,16 +16,23 @@ import {
   RowDataWithActions,
 } from '../components/ui/data-table';
 import { DataTableColumnHeader } from '../components/ui/data-table/data-table-column-header';
+import { useIsMobile } from './use-mobile';
 
 function useOwnerColumn<T extends HasOwner | HasOwnerId>(
   columns: ColumnDef<RowDataWithActions<T>, unknown>[],
   index: number,
+  hideOnMobile = false,
 ): ColumnDef<RowDataWithActions<T>, unknown>[] {
   const {
     embedState: { isEmbedded },
   } = useEmbedding();
-  console.log('isEmbedded', isEmbedded);
+  const isMobile = useIsMobile();
   if (isEmbedded) {
+    return columns;
+  }
+  // Owner is a 180px avatar+name column — too costly on a phone, where the
+  // flow name and status matter far more.
+  if (hideOnMobile && isMobile) {
     return columns;
   }
 

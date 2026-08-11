@@ -15,6 +15,7 @@ import {
 } from '@/features/folders/component/folder-filter-list';
 import { piecesHooks } from '@/features/pieces/lib/pieces-hooks';
 import { ownerColumnHooks } from '@/hooks/owner-column-hooks';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { authenticationSession } from '@/lib/authentication-session';
 import { useNewWindow } from '@/lib/navigation-utils';
 import { formatUtils } from '@/lib/utils';
@@ -32,6 +33,7 @@ type FlowsTableProps = {
 
 export const FlowsTable = ({ refetch: parentRefetch }: FlowsTableProps) => {
   const { embedState } = useEmbedding();
+  const isMobile = useIsMobile();
   const openNewWindow = useNewWindow();
   const [searchParams] = useSearchParams();
   const projectId = authenticationSession.getProjectId()!;
@@ -88,8 +90,10 @@ export const FlowsTable = ({ refetch: parentRefetch }: FlowsTableProps) => {
       refetch: handleRefetch,
       refresh,
       setRefresh,
+      isMobile,
     }),
     3,
+    true,
   );
 
   const filters: DataTableFilters<
@@ -139,10 +143,13 @@ export const FlowsTable = ({ refetch: parentRefetch }: FlowsTableProps) => {
 
   return (
     <div className="flex flex-row gap-8">
-      {!embedState.hideFolders && (
+      {/* FolderFilterList is a fixed w-[250px] column, which leaves too little
+          room for the flows table on a phone. Drop it below the mobile
+          breakpoint so the table gets the full width. */}
+      {!embedState.hideFolders && !isMobile && (
         <FolderFilterList key="folder-filter" refresh={refresh} />
       )}
-      <div className="overflow-hidden w-full ">
+      <div className="overflow-hidden w-full min-w-0">
         <DataTable
           emptyStateTextTitle={t('No flows found')}
           emptyStateTextDescription={t('Create a workflow to start automating')}

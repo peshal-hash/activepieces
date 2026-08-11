@@ -27,6 +27,7 @@ import { flowHooks } from '@/features/flows/lib/flow-hooks';
 import { foldersHooks } from '@/features/folders/lib/folders-hooks';
 import { useAuthorization } from '@/hooks/authorization-hooks';
 import { flagsHooks } from '@/hooks/flags-hooks';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   getProjectName,
   projectCollectionUtils,
@@ -54,9 +55,13 @@ export const BuilderHeader = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const openNewWindow = useNewWindow();
-  const { data: showSupport } = flagsHooks.useFlag<boolean>(
+  const isMobile = useIsMobile();
+  const { data: showSupportFlag } = flagsHooks.useFlag<boolean>(
     ApFlagId.SHOW_COMMUNITY,
   );
+  // The builder header is tight on a phone; Support is the least essential
+  // control there, so drop it and keep the room for Runs / publish.
+  const showSupport = showSupportFlag && !isMobile;
 
   const hasPermissionToReadRuns = useAuthorization().checkAccess(
     Permission.READ_FLOW,
@@ -175,7 +180,12 @@ export const BuilderHeader = () => {
   );
 
   const rightContent = (
-    <div className="flex items-center justify-center gap-4">
+    <div
+      className={cn('flex items-center justify-center', {
+        'gap-4': !isMobile,
+        'gap-1': isMobile,
+      })}
+    >
       {showSupport && (
         <Button
           variant="ghost"
@@ -191,9 +201,11 @@ export const BuilderHeader = () => {
           variant="ghost"
           onClick={() => setRightSidebar(RightSideBarType.RUNS)}
           className="gap-2 px-2"
+          title={t('Runs')}
+          aria-label={t('Runs')}
         >
           <HistoryIcon className="w-4 h-4" />
-          {t('Runs')}
+          {!isMobile && t('Runs')}
         </Button>
       )}
 
