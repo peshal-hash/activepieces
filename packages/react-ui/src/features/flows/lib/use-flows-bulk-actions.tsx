@@ -13,6 +13,7 @@ import { PushToGitDialog } from '@/features/project-releases/components/push-to-
 import { gitSyncHooks } from '@/features/project-releases/lib/git-sync-hooks';
 import { useAuthorization } from '@/hooks/authorization-hooks';
 import { platformHooks } from '@/hooks/platform-hooks';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { authenticationSession } from '@/lib/authentication-session';
 import { GitBranchType } from '@activepieces/ee-shared';
 import {
@@ -58,6 +59,7 @@ export const useFlowsBulkActions = ({
       flow.version.state === FlowVersionState.LOCKED,
   );
   const { embedState } = useEmbedding();
+  const isMobile = useIsMobile();
   const { platform } = platformHooks.useCurrentPlatform();
   const { gitSync } = gitSyncHooks.useGitSync(
     authenticationSession.getProjectId()!,
@@ -178,7 +180,13 @@ export const useFlowsBulkActions = ({
                   </ConfirmationDeleteDialog>
                 </PermissionNeededTooltip>
               )}
-              <ImportFlowButton folderId={folderId} onRefresh={refetch} />
+              {/* Import collapses to an icon on mobile so the primary
+                  "New Flow" action keeps its label and stays on screen. */}
+              <ImportFlowButton
+                folderId={folderId}
+                onRefresh={refetch}
+                variant={isMobile ? 'small' : 'default'}
+              />
               <NewFlowButton folderId={folderId} />
             </div>
           );
@@ -193,6 +201,7 @@ export const useFlowsBulkActions = ({
     selectedRows,
     refresh,
     allowPush,
+    isMobile,
     embedState.hideFolders,
     isDevelopmentBranch,
     exportFlows,

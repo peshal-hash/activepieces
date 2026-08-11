@@ -293,8 +293,8 @@ export function DataTable<
     <div>
       {((filters && filters.length > 0) || bulkActions.length > 0) && (
         <DataTableToolbar>
-          <div className="w-full flex items-center justify-between">
-            <div className="flex items-center space-x-2">
+          <div className="w-full flex flex-wrap items-center justify-between gap-2 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
               {filters &&
                 filters.map((filter) => (
                   <DataTableFilter

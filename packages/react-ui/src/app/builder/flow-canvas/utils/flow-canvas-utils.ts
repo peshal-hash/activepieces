@@ -1,6 +1,7 @@
 import { t } from 'i18next';
 
 import { flowRunUtils } from '@/features/flow-runs/lib/flow-run-utils';
+import { MOBILE_BREAKPOINT } from '@/hooks/use-mobile';
 import { NEW_FLOW_QUERY_PARAM } from '@/lib/utils';
 import {
   FlowAction,
@@ -526,6 +527,12 @@ function determineInitiallySelectedStep(
     return failedStepNameInRun;
   }
   if (isNewFlow) {
+    return null;
+  }
+  // On a phone the right sidebar is a full-screen overlay, so auto-selecting a
+  // step means the builder opens straight into step settings and the flow is
+  // never visible. Open on the canvas instead and let the user tap a step.
+  if (window.innerWidth < MOBILE_BREAKPOINT) {
     return null;
   }
   return firstInvalidStep?.name ?? 'trigger';
