@@ -59,8 +59,7 @@ FROM base AS build
 
 WORKDIR /usr/src/app
 
-# Copy only dependency files first for better layer caching
-COPY .npmrc package.json ./
+COPY .npmrc package.json bunfig.toml ./
 
 # Install all dependencies
 RUN --mount=type=cache,target=/root/.bun/install/cache \
@@ -78,9 +77,11 @@ RUN npx nx run-many --target=build --projects=react-ui,server-api --configuratio
 RUN npx nx build pieces-nexopta-agent --skip-nx-cache
 
 # Install production dependencies only for the backend API
+# --ignore-scripts: this runs in dist/, outside the reach of the root bunfig.toml,
+# so the flag is what keeps redis-memory-server from compiling Redis here too.
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     cd dist/packages/server/api && \
-    bun install --production --frozen-lockfile
+    bun install --production --frozen-lockfile --ignore-scripts
 
 # ------------ RUNTIME STAGE ------------
 FROM base AS run
@@ -154,5 +155,9 @@ ENTRYPOINT ["./docker-entrypoint.sh"]
 
 EXPOSE 5000
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
-    CMD curl -fsS http://127.0.0.1:5000/ || exit 1
+# Probe the Activepieces backend, not just the proxy. The proxy starts serving
+# well before Node is listening, so a check against :5000 alone reports healthy
+# while every proxied request still 502s.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=5 \
+    CMD curl -fsS http://127.0.0.1:5000/ >/dev/null 2>&1 \
+        && curl -fsS http://127.0.0.1:3000/v1/flags >/dev/null 2>&1 || exit 1
