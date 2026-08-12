@@ -3,7 +3,7 @@ import { AuthFormTemplate } from '@/features/authentication/components/auth-form
 
 const SignInPage: React.FC = () => {
   return (
-    <div className="mx-auto flex h-screen flex-col items-center justify-center gap-2">
+    <div className="mx-auto flex min-h-screen w-full flex-col items-center justify-center gap-2 px-4 py-8">
       <FullLogo />
       <AuthFormTemplate form={'signin'} />
     </div>

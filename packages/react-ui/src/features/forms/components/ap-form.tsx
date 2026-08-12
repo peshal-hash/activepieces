@@ -198,10 +198,10 @@ const ApForm = ({ form, useDraft }: ApFormProps) => {
   );
   return (
     <div className="w-full h-full flex">
-      <div className="container py-20">
+      <div className="container px-4 py-10 sm:py-20">
         <Form {...reactForm}>
           <form onSubmit={(e) => reactForm.handleSubmit(() => mutate())(e)}>
-            <Card className="w-[500px] mx-auto">
+            <Card className="w-full max-w-[500px] mx-auto">
               <CardHeader>
                 <CardTitle className="text-center">{form?.title}</CardTitle>
               </CardHeader>
