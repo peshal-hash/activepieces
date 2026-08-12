@@ -23,9 +23,17 @@ import { flowsUtils } from '../lib/flows-utils';
 
 type FlowStatusToggleProps = {
   flow: PopulatedFlow;
+  /**
+   * Hides the trigger-type icon beside the switch. The mobile status column
+   * only fits the 40px switch; the icon would overflow onto the Steps column.
+   */
+  hideStatusIcon?: boolean;
 };
 
-const FlowStatusToggle = ({ flow }: FlowStatusToggleProps) => {
+const FlowStatusToggle = ({
+  flow,
+  hideStatusIcon = false,
+}: FlowStatusToggleProps) => {
   const [isFlowPublished, setIsFlowPublished] = useState(
     flow.status === FlowStatus.ENABLED,
   );
@@ -75,7 +83,7 @@ const FlowStatusToggle = ({ flow }: FlowStatusToggleProps) => {
             : t('Permission Needed')}
         </TooltipContent>
       </Tooltip>
-      {isLoading ? (
+      {hideStatusIcon ? null : isLoading ? (
         <LoadingSpinner />
       ) : (
         isFlowPublished && (

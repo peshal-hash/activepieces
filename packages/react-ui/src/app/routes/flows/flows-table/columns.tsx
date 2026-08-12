@@ -65,7 +65,11 @@ export const flowsTableColumns = ({
     : [
         {
           accessorKey: 'updated',
-          header: ({ column }: { column: Column<RowDataWithActions<PopulatedFlow>> }) => (
+          header: ({
+            column,
+          }: {
+            column: Column<RowDataWithActions<PopulatedFlow>>;
+          }) => (
             <DataTableColumnHeader
               column={column}
               title={t('Last modified')}
@@ -103,7 +107,10 @@ export const flowsTableColumns = ({
           })}
           onClick={(e) => e.stopPropagation()}
         >
-          <FlowStatusToggle flow={row.original}></FlowStatusToggle>
+          <FlowStatusToggle
+            flow={row.original}
+            hideStatusIcon={isMobile}
+          ></FlowStatusToggle>
         </div>
       );
     },

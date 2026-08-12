@@ -95,7 +95,7 @@ const AuthFormTemplate = React.memo(
     }
 
     return (
-      <Card className="w-md rounded-sm drop-shadow-xl">
+      <Card className="w-full max-w-md rounded-sm drop-shadow-xl">
         {!showCheckYourEmailNote && (
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">{data.title}</CardTitle>

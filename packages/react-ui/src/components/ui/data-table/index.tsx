@@ -254,6 +254,18 @@ export function DataTable<
     );
   }, [table.getSelectedRowModel().rows]);
 
+  // Only trusted when every visible column is sized, otherwise the sum would
+  // under-report and wrongly shrink the table.
+  const visibleLeafColumns = table.getVisibleLeafColumns();
+  const totalDeclaredColumnWidth = visibleLeafColumns.every(
+    (column) => column.columnDef.size,
+  )
+    ? visibleLeafColumns.reduce(
+        (sum, column) => sum + (column.columnDef.size ?? 0),
+        0,
+      )
+    : 0;
+
   useEffect(() => {
     if (hidePagination) {
       return;
@@ -323,8 +335,17 @@ export function DataTable<
         </DataTableToolbar>
       )}
 
-      <div className="rounded-md mt-0 overflow-hidden">
-        <Table className="table-fixed">
+      {/* No overflow-hidden: Table has its own overflow-auto wrapper, and
+          clipping it makes columns wider than the viewport unreachable. */}
+      <div className="rounded-md mt-0">
+        <Table
+          className="table-fixed"
+          style={
+            totalDeclaredColumnWidth > 0
+              ? { minWidth: totalDeclaredColumnWidth }
+              : undefined
+          }
+        >
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">

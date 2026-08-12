@@ -89,7 +89,7 @@ const NewConnectionDialog = React.memo(
               />
             </div>
             <ScrollArea className="grow overflow-y-auto ">
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {(isLoading ||
                   (filteredPieces && filteredPieces.length === 0)) && (
                   <div className="text-center">{t('No pieces found')}</div>

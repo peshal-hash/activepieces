@@ -38,7 +38,7 @@ export const PiecesList: React.FC<PiecesContentProps> = ({
 
       <ScrollArea className="flex-1 min-h-0 px-4 py-2">
         {isPiecesLoading ? (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {Array.from({ length: 22 }).map((_, i) => (
               <Skeleton key={i} className="h-12 w-full rounded-lg" />
             ))}
@@ -48,7 +48,7 @@ export const PiecesList: React.FC<PiecesContentProps> = ({
             {t('No pieces found')}
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {pieceMetadata.map((piece, index) => (
               <div
                 key={index}
