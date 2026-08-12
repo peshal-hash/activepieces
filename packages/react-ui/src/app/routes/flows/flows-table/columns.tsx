@@ -33,8 +33,8 @@ export const flowsTableColumns = ({
     accessorKey: 'name',
     // Sizes are applied as hard width/minWidth/maxWidth by DataTable, so they
     // have to shrink on a phone or the row overflows and gets clipped.
-    // Mobile budget: 40 select + 150 name + 64 steps + 72 status + 40 actions.
-    size: isMobile ? 150 : 200,
+    // Mobile budget: 40 select + 168 name + 64 steps + 56 status + 40 actions.
+    size: isMobile ? 168 : 200,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title={t('Name')} icon={Tag} />
     ),
@@ -85,7 +85,9 @@ export const flowsTableColumns = ({
       ]),
   {
     accessorKey: 'status',
-    size: isMobile ? 72 : undefined,
+    // 40px switch + 16px cell padding — anything wider shows up as a gap
+    // between the toggle and the actions column on a phone.
+    size: isMobile ? 56 : undefined,
     header: ({ column }) => (
       <DataTableColumnHeader
         column={column}
@@ -96,7 +98,9 @@ export const flowsTableColumns = ({
     cell: ({ row }) => {
       return (
         <div
-          className="flex items-center space-x-2"
+          className={cn('flex items-center space-x-2', {
+            'justify-end space-x-0': isMobile,
+          })}
           onClick={(e) => e.stopPropagation()}
         >
           <FlowStatusToggle flow={row.original}></FlowStatusToggle>
