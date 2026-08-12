@@ -7,7 +7,7 @@
 # RESOURCE_GROUP, so a name that exists only in testing-containers fails as ResourceNotFound.
 ENVIRONMENT_NAME="Production"
 RESOURCE_GROUP="salesoptai-container-prod"
-ACR_NAME="salesoptaiprod"
+ACR_NAME="salesopttest"
 LOCATION="canadacentral"
 BICEP_FILE="./activepieces-prod.bicep"
 KEY_VAULT_NAME="salesoptai-prod-keyvault"
