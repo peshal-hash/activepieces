@@ -68,7 +68,7 @@ export const ChatDrawer = () => {
       dismissible={false}
       modal={false}
     >
-      <DrawerContent className="w-[500px] overflow-x-hidden">
+      <DrawerContent className="w-full sm:w-[500px] max-w-full overflow-x-hidden">
         <DrawerHeader>
           <div className="p-4">
             <div className="flex items-center gap-1">

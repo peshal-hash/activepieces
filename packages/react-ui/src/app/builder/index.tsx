@@ -94,6 +94,8 @@ const BuilderPage = () => {
   flowCanvasHooks.useSetSocketListener(refetchPiece);
   const [hasCanvasBeenInitialised, setHasCanvasBeenInitialised] =
     useState(false);
+  const isMobileSidebarOpen =
+    isMobile && rightSidebar !== RightSideBarType.NONE;
 
   // Shared by the desktop resizable panel and the mobile full-screen overlay.
   const sidebarContent = (
@@ -120,36 +122,54 @@ const BuilderPage = () => {
   );
 
   return (
-    <div className="flex h-full w-full flex-col relative">
-      <div className="z-50">
+    <div className="flex h-full w-full flex-col relative overflow-hidden">
+      {/* Above the canvas chrome, below the mobile sheet (z-60). */}
+      <div className="relative z-50 shrink-0">
         <BuilderHeader />
       </div>
-      <ResizablePanelGroup direction="horizontal">
-        <ResizablePanel defaultSize={100} order={2} id="flow-canvas">
-          <div ref={middlePanelRef} className="relative h-full w-full">
+      <ResizablePanelGroup
+        direction="horizontal"
+        className="flex-1 min-h-0 min-w-0"
+      >
+        <ResizablePanel
+          defaultSize={100}
+          order={2}
+          id="flow-canvas"
+          className="min-w-0"
+        >
+          <div
+            ref={middlePanelRef}
+            className="relative h-full w-full overflow-hidden"
+          >
             <CursorPositionProvider>
               <FlowCanvas
                 setHasCanvasBeenInitialised={setHasCanvasBeenInitialised}
               ></FlowCanvas>
             </CursorPositionProvider>
 
-            <PublishFlowReminderWidget />
-            <RunInfoWidget />
-            <ViewingOldVersionWidget />
-            {middlePanelRef.current &&
-              middlePanelRef.current.clientWidth > 0 && (
-                <CanvasControls
-                  canvasHeight={middlePanelRef.current?.clientHeight ?? 0}
-                  canvasWidth={middlePanelRef.current?.clientWidth ?? 0}
-                  hasCanvasBeenInitialised={hasCanvasBeenInitialised}
-                  selectedStep={selectedStep}
-                ></CanvasControls>
-              )}
+            {/* Unreachable while the mobile sheet covers the canvas, so skip
+                it rather than stack it underneath. */}
+            {!isMobileSidebarOpen && (
+              <>
+                <PublishFlowReminderWidget />
+                <RunInfoWidget />
+                <ViewingOldVersionWidget />
+                {middlePanelRef.current &&
+                  middlePanelRef.current.clientWidth > 0 && (
+                    <CanvasControls
+                      canvasHeight={middlePanelRef.current?.clientHeight ?? 0}
+                      canvasWidth={middlePanelRef.current?.clientWidth ?? 0}
+                      hasCanvasBeenInitialised={hasCanvasBeenInitialised}
+                      selectedStep={selectedStep}
+                    ></CanvasControls>
+                  )}
 
-            <ShowPoweredBy
-              position="absolute"
-              show={platform?.plan.showPoweredBy}
-            />
+                <ShowPoweredBy
+                  position="absolute"
+                  show={platform?.plan.showPoweredBy}
+                />
+              </>
+            )}
             <DataSelector
               parentHeight={middlePanelSize.height}
               parentWidth={middlePanelSize.width}
@@ -198,8 +218,13 @@ const BuilderPage = () => {
         )}
       </ResizablePanelGroup>
 
-      {isMobile && rightSidebar !== RightSideBarType.NONE && (
-        <div className="absolute inset-0 z-40 bg-background flex flex-col">
+      {/* Starts below the header and sits above every canvas overlay (which
+          top out at z-50) so nothing bleeds through the step settings. */}
+      {isMobileSidebarOpen && (
+        <div
+          className="absolute inset-x-0 bottom-0 z-[60] bg-background flex flex-col overscroll-contain"
+          style={{ top: `${flowCanvasConsts.BUILDER_HEADER_HEIGHT}px` }}
+        >
           <div className="flex items-center justify-end border-b px-2 py-1 shrink-0">
             <Button
               variant="ghost"
@@ -218,7 +243,9 @@ const BuilderPage = () => {
               <X className="size-4" />
             </Button>
           </div>
-          <div className="flex-1 min-h-0">{sidebarContent}</div>
+          <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
+            {sidebarContent}
+          </div>
         </div>
       )}
 

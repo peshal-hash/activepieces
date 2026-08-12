@@ -59,10 +59,10 @@ const VerifyEmail = () => {
     return <Navigate to="/sign-in" replace />;
   }
   return (
-    <div className="mx-auto h-screen w-screen flex flex-col items-center justify-center gap-2">
+    <div className="mx-auto min-h-screen w-full flex flex-col items-center justify-center gap-2 px-4 py-8">
       <FullLogo />
 
-      <Card className="w-md rounded-sm drop-shadow-xl p-4">
+      <Card className="w-full max-w-md rounded-sm drop-shadow-xl p-4">
         <div className="gap-2 w-full flex flex-col">
           <div className="gap-4 w-full flex flex-row items-center justify-center">
             {!isPending && !isExpired && (

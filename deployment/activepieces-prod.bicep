@@ -2,12 +2,14 @@ param location string
 param salesoptapis string
 param salesoptbackendapis string
 param environmentName string = 'testAPContainerEnvironment'
+param environmentResourceGroup string = resourceGroup().name
 param logAnalyticsWorkspaceName string = 'ap-logs-${uniqueString(resourceGroup().id)}'
 param acrName string
 param appImageTag string = 'latest'
 param keyVaultName string = 'salesopt-kv-test'
 param revisionSuffix string = ''
 param containerAppName string
+param managedIdentityName string = 'salesopt-container-identity'
 param postgresServerName string
 param postgresAdminUser string
 param redisCacheName string
@@ -32,6 +34,7 @@ param jwtSecret string
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: acrName
+  scope: resourceGroup(environmentResourceGroup)
 }
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
@@ -39,7 +42,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
 }
 
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
-  name: 'salesopt-container-identity'
+  name: managedIdentityName
+  scope: resourceGroup(environmentResourceGroup)
 }
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' = if (deployNewInfrastructure) {
@@ -54,6 +58,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10
 
 resource existingLogAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
   name: logAnalyticsWorkspaceName
+  scope: resourceGroup(environmentResourceGroup)
 }
 
 resource environment 'Microsoft.App/managedEnvironments@2023-05-01' = if (deployNewInfrastructure) {
@@ -72,6 +77,7 @@ resource environment 'Microsoft.App/managedEnvironments@2023-05-01' = if (deploy
 
 resource existingEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
   name: environmentName
+  scope: resourceGroup(environmentResourceGroup)
 }
 
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-03-01-preview' = if (deployNewInfrastructure) {
