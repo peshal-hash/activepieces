@@ -60,6 +60,7 @@
     "@fastify/otel": "0.9.3",
     "@fastify/rate-limit": "10.3.0",
     "@fastify/swagger": "9.5.1",
+    "@fastify/swagger-ui": "5.2.5",
     "@fastify/type-provider-typebox": "5.1.0",
     "@hookform/resolvers": "3.9.0",
     "@hyperdx/node-opentelemetry": "0.8.2",
