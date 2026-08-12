@@ -1,12 +1,20 @@
 #!/bin/bash
 
-# Development Environment Configuration
+# Production Environment Configuration
+#
+# Every resource below lives in the salesoptai-container-prod resource group. The Bicep
+# resolves the environment, identity, ACR, key vault, Postgres and Redis by NAME within
+# RESOURCE_GROUP, so a name that exists only in testing-containers fails as ResourceNotFound.
 ENVIRONMENT_NAME="Production"
-RESOURCE_GROUP="testing-containers"
-ACR_NAME="salesopttest"
+RESOURCE_GROUP="salesoptai-container-prod"
+ACR_NAME="salesoptaiprod"
 LOCATION="canadacentral"
 BICEP_FILE="./activepieces-prod.bicep"
-KEY_VAULT_NAME="salesopt-kv-test"
+KEY_VAULT_NAME="salesoptai-prod-keyvault"
+CONTAINER_ENVIRONMENT_NAME="testAPContainerEnvironment"
+ENVIRONMENT_RESOURCE_GROUP="testing-containers"
+LOG_ANALYTICS_WORKSPACE_NAME="ap-logs-2f4vvjdjzptqu"
+MANAGED_IDENTITY_NAME="salesoptai-prod-identity"
 JWT_SECRET="60101f484c388ae3c862afee41f7da3f2ce03548d4caebe4f7f85ee34e7c99a6"
 ENCRYPTION_KEY="04c7c35b3e32cb7b2353d758437a2bbe"
 API_KEY="f379cfbee75176ebfe6f39b4b7dedf123b8cd54b8b5343180ee650625d5100532c5a9a954a0d98fc9079b31445ced0f1a24088d81ca30fd6e9951f8cc4701622"
@@ -14,10 +22,10 @@ UNIQUE_ID=$(head -c 4 /dev/urandom | xxd -p)
 
 # App-specific name for the Activepieces container
 APP_NAME_ACTIVEPIECES="agentops"
-# Names for your new Postgres and Redis resources
+# Postgres and Redis, both in RESOURCE_GROUP above.
 POSTGRES_SERVER_NAME="salesopt-pg-server-prod"
 POSTGRES_ADMIN_USER="salesoptadmin"
-REDIS_CACHE_NAME="salesopt-redis-cache-prod"
+REDIS_CACHE_NAME="salesopt-redis-prod-01"
 SALESOPTAI_APIS="https://portal.salesoptai.com,https://portal.nexopta.com,https://portal.nexopta.ai,https://gentle-grass-02d3f240f.1.azurestaticapps.net,https://salesopt-app.redriver-d84691b9.eastus.azurecontainerapps.io,https://portal.salesopt.ai,https://salesoptai-app-prod.icystone-9246cdc7.canadaeast.azurecontainerapps.io"
 # SalesOpt backend base URL exposed to the SalesOpt Agent piece (read from process.env).
 AP_SALESOPTAI_BACKEND_APIS="https://salesoptai-app-prod.icystone-9246cdc7.canadaeast.azurecontainerapps.io"

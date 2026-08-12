@@ -88,6 +88,10 @@ function deploy_infrastructure() {
         appImageTag="$IMAGE_TAG" \
         revisionSuffix="$REVISION_SUFFIX" \
         containerAppName="$APP_NAME_ACTIVEPIECES" \
+        environmentName="$CONTAINER_ENVIRONMENT_NAME" \
+        environmentResourceGroup="$ENVIRONMENT_RESOURCE_GROUP" \
+        logAnalyticsWorkspaceName="$LOG_ANALYTICS_WORKSPACE_NAME" \
+        managedIdentityName="$MANAGED_IDENTITY_NAME" \
         postgresServerName="$POSTGRES_SERVER_NAME" \
         postgresAdminUser="$POSTGRES_ADMIN_USER" \
         redisCacheName="$REDIS_CACHE_NAME" \
