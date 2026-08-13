@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthorization } from '@/hooks/authorization-hooks';
 import { platformHooks } from '@/hooks/platform-hooks';
 import { projectCollectionUtils } from '@/hooks/project-collection';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { authenticationSession } from '@/lib/authentication-session';
 import { cn } from '@/lib/utils';
 import { Permission } from '@activepieces/shared';
@@ -39,7 +40,12 @@ export const ProjectDashboardLayoutHeader = () => {
   const { embedState } = useEmbedding();
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const isEmbedded = embedState.isEmbedded;
+  // The "Projects" row adds no navigation value on the flows list in mobile
+  // view, where it only eats vertical space above the Flows/Tables/Runs tabs.
+  const hideProjectPageHeader =
+    isMobile && location.pathname.includes('/flows');
   const flowsLink: ProjectDashboardLayoutHeaderTab = {
     to: authenticationSession.appendProjectRoutePrefix('/flows'),
     label: t('Flows'),
@@ -106,7 +112,7 @@ export const ProjectDashboardLayoutHeader = () => {
   );
   return (
     <div className="flex flex-col gap-1">
-      {!isEmbedded && <ProjectDashboardPageHeader />}
+      {!isEmbedded && !hideProjectPageHeader && <ProjectDashboardPageHeader />}
       <Tabs className="px-4">
         {!embedState.hideSideNav && (
           <TabsList variant="outline">
