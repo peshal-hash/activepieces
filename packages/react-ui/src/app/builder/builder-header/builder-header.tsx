@@ -227,7 +227,10 @@ export const BuilderHeader = () => {
         leftContent={leftContent}
         showBorder={true}
         className="select-none"
-        hideSidebarTrigger={embedState.isEmbedded}
+        // The builder is a focused, full-screen editing surface — the
+        // dashboard sidebar this trigger opens has nothing useful to offer
+        // here, and the breadcrumb above already provides the way back out.
+        hideSidebarTrigger={true}
       />
     </div>
   );

@@ -1,5 +1,3 @@
-import { t } from 'i18next';
-import { X } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { useBuilderStateContext } from '@/app/builder/builder-hooks';
@@ -8,7 +6,6 @@ import { CanvasControls } from '@/app/builder/flow-canvas/canvas-controls';
 import { StepSettingsProvider } from '@/app/builder/step-settings/step-settings-context';
 import { ChatDrawer } from '@/app/routes/chat/chat-drawer';
 import { ShowPoweredBy } from '@/components/show-powered-by';
-import { Button } from '@/components/ui/button';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -48,19 +45,9 @@ const animateResizeClassName = `transition-all `;
 const BuilderPage = () => {
   const { platform } = platformHooks.useCurrentPlatform();
   const isMobile = useIsMobile();
-  const [
-    flowVersion,
-    rightSidebar,
-    selectedStep,
-    exitStepSettings,
-    setRightSidebar,
-  ] = useBuilderStateContext((state) => [
-    state.flowVersion,
-    state.rightSidebar,
-    state.selectedStep,
-    state.exitStepSettings,
-    state.setRightSidebar,
-  ]);
+  const [flowVersion, rightSidebar, selectedStep] = useBuilderStateContext(
+    (state) => [state.flowVersion, state.rightSidebar, state.selectedStep],
+  );
   flowCanvasHooks.useShowBuilderIsSavingWarningBeforeLeaving();
   const { memorizedSelectedStep } = useBuilderStateContext((state) => {
     const flowVersion = state.flowVersion;
@@ -225,24 +212,13 @@ const BuilderPage = () => {
           className="absolute inset-x-0 bottom-0 z-[60] bg-background flex flex-col overscroll-contain"
           style={{ top: `${flowCanvasConsts.BUILDER_HEADER_HEIGHT}px` }}
         >
-          <div className="flex items-center justify-end border-b px-2 py-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t('Close')}
-              onClick={() => {
-                // Runs/Versions are just panels — only step settings owns a
-                // step selection that needs clearing.
-                if (rightSidebar === RightSideBarType.PIECE_SETTINGS) {
-                  exitStepSettings();
-                } else {
-                  setRightSidebar(RightSideBarType.NONE);
-                }
-              }}
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
+          {/* No close button here on purpose. Every panel this overlay can
+              host (step settings, runs, versions) already renders its own
+              SidebarHeader with an X that performs the same close, so adding
+              one here stacked two identical crosses on top of each other and
+              left it ambiguous which one returned to the flow. The panel's own
+              header is the one to keep: it sits beside the step name, so it
+              reads as "close this step" rather than a bare anonymous X. */}
           <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
             {sidebarContent}
           </div>
