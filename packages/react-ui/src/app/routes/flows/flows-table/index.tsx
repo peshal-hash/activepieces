@@ -14,7 +14,6 @@ import {
   folderIdParamName,
 } from '@/features/folders/component/folder-filter-list';
 import { piecesHooks } from '@/features/pieces/lib/pieces-hooks';
-import { ownerColumnHooks } from '@/hooks/owner-column-hooks';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { authenticationSession } from '@/lib/authentication-session';
 import { useNewWindow } from '@/lib/navigation-utils';
@@ -85,16 +84,15 @@ export const FlowsTable = ({ refetch: parentRefetch }: FlowsTableProps) => {
     }
   };
 
-  const columns = ownerColumnHooks.useOwnerColumn<PopulatedFlow>(
-    flowsTableColumns({
-      refetch: handleRefetch,
-      refresh,
-      setRefresh,
-      isMobile,
-    }),
-    3,
-    true,
-  );
+  // No Owner column here on purpose — it is not useful in the flow list. The
+  // ownerColumnHooks.useOwnerColumn wrapper is still used by the connections
+  // table, so this opts flows out rather than changing the shared hook.
+  const columns = flowsTableColumns({
+    refetch: handleRefetch,
+    refresh,
+    setRefresh,
+    isMobile,
+  });
 
   const filters: DataTableFilters<
     keyof PopulatedFlow | 'connectionExternalId' | 'name'

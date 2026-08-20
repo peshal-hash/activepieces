@@ -64,7 +64,12 @@ export function generateTheme({
 }
 
 export const defaultTheme = generateTheme({
-    primaryColor: '#1B76C7',
+    // Nexopta brand teal, one step darker than the brand sheet's #179da6.
+    // ThemeProvider pushes this value into the --primary CSS variable at
+    // runtime, where it backs white button text: #179da6 behind white is only
+    // 3.28:1 (WCAG AA wants 4.5:1), while #12818a is 4.63:1 and reads as the
+    // same colour. Kept in step with --primary in react-ui/src/styles.css.
+    primaryColor: '#12818a',
     websiteName: 'NexOpta',
     fullLogoUrl: "/static/ap-logo.png",
     favIconUrl: "/static/favicon.png",
