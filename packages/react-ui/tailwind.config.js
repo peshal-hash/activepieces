@@ -93,7 +93,11 @@ module.exports = {
         xss: 'calc(var(--radius) - 10px)',
       },
       fontFamily: {
-        inter: ['Inter', 'sans-serif'],
+        /* Nexopta brand typeface. The `inter` key is kept as an alias so the
+           existing `font-inter` utilities keep resolving; both names now map
+           to Montserrat. */
+        montserrat: ['Montserrat', 'sans-serif'],
+        inter: ['Montserrat', 'sans-serif'],
       },
       fontSize: {
         'xss': '0.65rem',
