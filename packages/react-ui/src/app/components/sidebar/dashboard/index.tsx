@@ -7,8 +7,6 @@ import {
   Workflow,
   Compass,
   Shield,
-  PanelLeftClose,
-  PanelLeftOpen,
 } from 'lucide-react';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -63,7 +61,7 @@ import { SidebarUser } from '../sidebar-user';
 export function ProjectDashboardSidebar() {
   const { data: projects } = projectCollectionUtils.useAll();
   const { embedState } = useEmbedding();
-  const { state, toggleSidebar } = useSidebar();
+  const { state } = useSidebar();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
@@ -212,10 +210,14 @@ export function ProjectDashboardSidebar() {
         <Sidebar
           variant="inset"
           collapsible="icon"
-          // The rail (the thin drag-to-resize strip) stays hidden for everyone;
-          // platform admins get an explicit toggle button in the Flows header
-          // instead, which is discoverable in a way the rail is not.
-          className="group p-1 cursor-default [&_[data-sidebar=trigger]]:hidden [&_[data-sidebar=rail]]:hidden"
+          // Platform admins get the built-in sidebar trigger (in the page
+          // header) to collapse/expand; everyone else keeps a fixed sidebar,
+          // so both the trigger and the rail stay hidden for them.
+          className={cn(
+            'group p-1 cursor-default',
+            !isPlatformAdmin &&
+              '[&_[data-sidebar=trigger]]:hidden [&_[data-sidebar=rail]]:hidden',
+          )}
         >
         <AppSidebarHeader />
         <SidebarContent
@@ -326,44 +328,7 @@ export function ProjectDashboardSidebar() {
                       </PopoverContent>
                     </Popover>
                   )}
-                  {isPlatformAdmin && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 hover:bg-accent"
-                          onClick={toggleSidebar}
-                        >
-                          <PanelLeftClose />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{t('Collapse sidebar')}</TooltipContent>
-                    </Tooltip>
-                  )}
                 </div>
-              </div>
-            )}
-            {/* Collapsed: the only way back out, since the rail and the
-                built-in trigger are both hidden. Platform admins are the only
-                ones with more than one project to switch between. */}
-            {state === 'collapsed' && isPlatformAdmin && (
-              <div className="flex justify-center pb-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 hover:bg-accent"
-                      onClick={toggleSidebar}
-                    >
-                      <PanelLeftOpen className="size-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {t('Expand to see project names')}
-                  </TooltipContent>
-                </Tooltip>
               </div>
             )}
             <div

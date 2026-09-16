@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useIsPlatformAdmin } from '@/hooks/authorization-hooks';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
@@ -82,34 +83,70 @@ const SidebarProvider = React.forwardRef<
     ref,
   ) => {
     const isMobile = useIsMobile();
+    // Collapsing/expanding is a platform-admin-only capability. For everyone
+    // else the sidebar stays permanently closed and every setter is a no-op,
+    // so no stray trigger can open it.
+    const isPlatformAdmin = useIsPlatformAdmin();
 
-    // ✅ Force sidebar to always be closed
-    const open = false;
-    const openMobile = false;
-    const state: SidebarContextProps['state'] = 'collapsed';
+    const [openState, setOpenState] = React.useState(() => {
+      if (!isPlatformAdmin) {
+        return false;
+      }
+      if (openProp !== undefined) {
+        return openProp;
+      }
+      try {
+        return getSidebarStateFromLocalStorage();
+      } catch {
+        // ignore storage errors (SSR / privacy mode)
+        return defaultOpen ?? true;
+      }
+    });
+    const [openMobileState, setOpenMobileState] = React.useState(false);
 
-    // ✅ Never allow opening
+    // `openProp` seeds the initial state only (see useState above) rather than
+    // making this fully controlled, so an admin can still toggle a layout that
+    // mounts the provider with a fixed `open`.
+    const open = isPlatformAdmin ? openState : false;
+    const openMobile = isPlatformAdmin ? openMobileState : false;
+    const state: SidebarContextProps['state'] = open ? 'expanded' : 'collapsed';
+
     const setOpen = React.useCallback(
-      (_next: boolean) => {
-        onOpenChangeProp?.(false);
+      (next: boolean) => {
+        if (!isPlatformAdmin) {
+          return;
+        }
+        setOpenState(next);
+        onOpenChangeProp?.(next);
         try {
-          setSidebarStateToLocalStorage(false);
+          setSidebarStateToLocalStorage(next);
         } catch {
           // ignore storage errors (SSR / privacy mode)
         }
       },
-      [onOpenChangeProp],
+      [isPlatformAdmin, onOpenChangeProp],
     );
 
-    const setOpenMobile = React.useCallback((_next: boolean) => {
-      // no-op: always closed
-    }, []);
+    const setOpenMobile = React.useCallback(
+      (next: boolean) => {
+        if (!isPlatformAdmin) {
+          return;
+        }
+        setOpenMobileState(next);
+      },
+      [isPlatformAdmin],
+    );
 
     const toggleSidebar = React.useCallback(() => {
-      // no-op: always closed
-      setOpen(false);
-      setOpenMobile(false);
-    }, [setOpen, setOpenMobile]);
+      if (!isPlatformAdmin) {
+        return;
+      }
+      if (isMobile) {
+        setOpenMobile(!openMobile);
+      } else {
+        setOpen(!open);
+      }
+    }, [isPlatformAdmin, isMobile, open, openMobile, setOpen, setOpenMobile]);
 
     // ✅ Ensure TS keeps correct literal types
     const contextValue = React.useMemo<SidebarContextProps>(
@@ -272,6 +309,12 @@ const SidebarTrigger = React.forwardRef<
   React.ComponentProps<typeof Button> & { iconClassName?: string }
 >(({ className, onClick, iconClassName, ...props }, ref) => {
   const { toggleSidebar, state } = useSidebar();
+  // Only platform admins can collapse/expand, so nobody else gets the button.
+  const isPlatformAdmin = useIsPlatformAdmin();
+
+  if (!isPlatformAdmin) {
+    return null;
+  }
 
   return (
     <Tooltip>
@@ -305,6 +348,12 @@ const SidebarRail = React.forwardRef<
   React.ComponentProps<'button'>
 >(({ className, ...props }, ref) => {
   const { toggleSidebar } = useSidebar();
+  // Same rule as the trigger: the rail is a toggle, so admins only.
+  const isPlatformAdmin = useIsPlatformAdmin();
+
+  if (!isPlatformAdmin) {
+    return null;
+  }
 
   return (
     <button
