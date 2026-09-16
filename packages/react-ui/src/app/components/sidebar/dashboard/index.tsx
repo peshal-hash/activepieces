@@ -1,6 +1,15 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { t } from 'i18next';
-import { Search, Plus, LineChart, Workflow, Compass, Shield } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  LineChart,
+  Workflow,
+  Compass,
+  Shield,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from 'lucide-react';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDebounce } from 'use-debounce';
@@ -54,7 +63,7 @@ import { SidebarUser } from '../sidebar-user';
 export function ProjectDashboardSidebar() {
   const { data: projects } = projectCollectionUtils.useAll();
   const { embedState } = useEmbedding();
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
@@ -82,8 +91,8 @@ export function ProjectDashboardSidebar() {
     if (platform.plan.teamProjectsLimit === TeamProjectsLimit.NONE) {
       return false;
     }
-    return true;
-  }, [platform.plan.teamProjectsLimit]);
+    return currentUser?.platformRole === PlatformRole.ADMIN;
+  }, [platform.plan.teamProjectsLimit, currentUser?.platformRole]);
 
   const shouldDisableNewProjectButton = useMemo(() => {
     if (platform.plan.teamProjectsLimit === TeamProjectsLimit.ONE) {
@@ -97,15 +106,27 @@ export function ProjectDashboardSidebar() {
 
   const isSearchMode = debouncedSearchQuery.length > 0;
 
+  const isPlatformAdmin = currentUser?.platformRole === PlatformRole.ADMIN;
+
+  const visibleProjects = useMemo(() => {
+    if (isPlatformAdmin) {
+      return projects;
+    }
+    const currentProject = projects.filter((project) =>
+      location.pathname.includes(`/projects/${project.id}`),
+    );
+    return currentProject.length > 0 ? currentProject : projects.slice(0, 1);
+  }, [isPlatformAdmin, projects, location.pathname]);
+
   const displayProjects = useMemo(() => {
     if (isSearchMode) {
       const query = debouncedSearchQuery.toLowerCase();
-      return projects.filter((project) =>
+      return visibleProjects.filter((project) =>
         project.displayName.toLowerCase().includes(query),
       );
     }
-    return projects;
-  }, [isSearchMode, debouncedSearchQuery, projects]);
+    return visibleProjects;
+  }, [isSearchMode, debouncedSearchQuery, visibleProjects]);
 
   const handleProjectSelect = useCallback(
     async (projectId: string) => {
@@ -191,7 +212,10 @@ export function ProjectDashboardSidebar() {
         <Sidebar
           variant="inset"
           collapsible="icon"
-            className="group p-1 cursor-default [&_[data-sidebar=trigger]]:hidden [&_[data-sidebar=rail]]:hidden"
+          // The rail (the thin drag-to-resize strip) stays hidden for everyone;
+          // platform admins get an explicit toggle button in the Flows header
+          // instead, which is discoverable in a way the rail is not.
+          className="group p-1 cursor-default [&_[data-sidebar=trigger]]:hidden [&_[data-sidebar=rail]]:hidden"
         >
         <AppSidebarHeader />
         <SidebarContent
@@ -302,7 +326,44 @@ export function ProjectDashboardSidebar() {
                       </PopoverContent>
                     </Popover>
                   )}
+                  {isPlatformAdmin && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 hover:bg-accent"
+                          onClick={toggleSidebar}
+                        >
+                          <PanelLeftClose />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('Collapse sidebar')}</TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
+              </div>
+            )}
+            {/* Collapsed: the only way back out, since the rail and the
+                built-in trigger are both hidden. Platform admins are the only
+                ones with more than one project to switch between. */}
+            {state === 'collapsed' && isPlatformAdmin && (
+              <div className="flex justify-center pb-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 hover:bg-accent"
+                      onClick={toggleSidebar}
+                    >
+                      <PanelLeftOpen className="size-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {t('Expand to see project names')}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             )}
             <div

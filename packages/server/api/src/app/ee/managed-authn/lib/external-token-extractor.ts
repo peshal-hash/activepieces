@@ -54,6 +54,7 @@ export const externalTokenExtractor = (log: FastifyBaseLogger) => {
                         filterType: piecesFilterType ?? PiecesFilterType.NONE,
                         tags: piecesTags ?? [],
                     },
+                    projectDisplayName: payload.projectDisplayName,
                 }
             }
             catch (error) {
@@ -140,6 +141,7 @@ function externalTokenPayload() {
                 filterType: Type.Enum(PiecesFilterType),
                 tags: Type.Optional(Type.Array(Type.String())),
             })),
+            projectDisplayName: Type.Optional(Type.String()),
         }),
     ])
 

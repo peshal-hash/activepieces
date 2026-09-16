@@ -35,6 +35,7 @@ const ProjectSideBarItem = ({
   handleProjectSelect,
 }: ProjectSideBarItemProps) => {
   const { state } = useSidebar();
+  const projectName = getProjectName(project);
   const projectAvatar =<Layers className="size-5 flex items-center justify-center cursor-pointer" />;
   return (
     <SidebarMenuItem>
@@ -54,7 +55,7 @@ const ProjectSideBarItem = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right" align="center">
-              Projects
+              {projectName}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -71,7 +72,7 @@ const ProjectSideBarItem = ({
           >
             <div className="flex-1 flex items-center gap-2 min-w-0">
               <ApProjectDisplay
-                title="Projects"
+                title={projectName}
                 maxLengthToNotShowTooltip={28}
                 projectType={project.type}
               />
