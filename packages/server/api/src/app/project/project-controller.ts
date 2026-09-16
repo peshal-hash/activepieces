@@ -1,8 +1,9 @@
 import { ProjectResourceType, securityAccess } from '@activepieces/server-shared'
-import { PrincipalType, Project, UpdateProjectRequestInCommunity } from '@activepieces/shared'
+import { assertNotNullOrUndefined, PrincipalType, Project, UpdateProjectRequestInCommunity } from '@activepieces/shared'
 import { FastifyPluginAsyncTypebox, Type } from '@fastify/type-provider-typebox'
 import { StatusCodes } from 'http-status-codes'
 import { paginationHelper } from '../helper/pagination/pagination-utils'
+import { userService } from '../user/user-service'
 import { projectService } from './project-service'
 
 
@@ -31,7 +32,14 @@ export const projectController: FastifyPluginAsyncTypebox = async (fastify) => {
             security: securityAccess.publicPlatform([PrincipalType.USER]),
         },
     }, async (request) => {
-        return paginationHelper.createPage([await projectService.getUserProjectOrThrow(request.principal.id)], null)
+        const user = await userService.getOneOrFail({ id: request.principal.id })
+        assertNotNullOrUndefined(user.platformId, 'platformId is undefined')
+        const projects = await projectService.getAllForUser({
+            platformId: user.platformId,
+            userId: user.id,
+            isPrivileged: userService.isUserPrivileged(user),
+        })
+        return paginationHelper.createPage(projects, null)
     })
 
     // 🔴 NEW: hard delete a project by ID

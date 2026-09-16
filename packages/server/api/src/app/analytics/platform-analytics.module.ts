@@ -1,5 +1,5 @@
 import { securityAccess } from '@activepieces/server-shared'
-import { ActivepiecesError, AnalyticsReportRequest, ErrorCode, LeaderboardRequest, PrincipalType, UserIdentityProvider } from '@activepieces/shared'
+import { ActivepiecesError, AnalyticsReportRequest, ErrorCode, LeaderboardRequest, PlatformRole, PrincipalType, UserIdentityProvider } from '@activepieces/shared'
 import { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { FastifyBaseLogger } from 'fastify'
 import { userIdentityService } from '../authentication/user-identity/user-identity-service'
@@ -53,6 +53,14 @@ const platformAnalyticsController: FastifyPluginAsyncTypebox = async (app) => {
 
 async function assertUserIsNotEmbedded(userId: string, log: FastifyBaseLogger): Promise<void> {
     const user = await userService.getOneOrFail({ id: userId })
+    // A platform admin is an operator of this platform, not a tenant embedded
+    // inside it. The check below exists to stop an embedded end-user reading
+    // platform-wide figures; it is not the authorization boundary, which is
+    // securityAccess.publicPlatform on each route. Without this exemption a
+    // JWT-provisioned admin is locked out of analytics on their own platform.
+    if (user.platformRole === PlatformRole.ADMIN) {
+        return
+    }
     const userIdentity = await userIdentityService(log).getOneOrFail({ id: user.identityId })
     if (userIdentity.provider === UserIdentityProvider.JWT) {
         throw new ActivepiecesError({

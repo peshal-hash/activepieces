@@ -1,5 +1,5 @@
 import { SigningKey, SigningKeyId } from '@activepieces/ee-shared'
-import { ActivepiecesError, DefaultProjectRole, ErrorCode, isNil, PiecesFilterType, PlatformId } from '@activepieces/shared'
+import { ActivepiecesError, DefaultProjectRole, ErrorCode, isNil, PiecesFilterType, PlatformId, PlatformRole } from '@activepieces/shared'
 import { Static, Type } from '@sinclair/typebox'
 import { FastifyBaseLogger } from 'fastify'
 import { JwtSignAlgorithm, jwtUtils } from '../../../helper/jwt-utils'
@@ -46,6 +46,10 @@ export const externalTokenExtractor = (log: FastifyBaseLogger) => {
                     externalFirstName: payload.firstName,
                     externalLastName: payload.lastName,
                     projectRole: projectRole.name,
+                    // Default rather than propagate undefined: the caller
+                    // writes this straight onto the user row, and MEMBER is
+                    // the safe value for a v1 token that predates the claim.
+                    platformRole: payload.platformRole ?? PlatformRole.MEMBER,
                     pieces: {
                         filterType: piecesFilterType ?? PiecesFilterType.NONE,
                         tags: piecesTags ?? [],
@@ -128,6 +132,10 @@ function externalTokenPayload() {
     const v2 = Type.Composite([v1,
         Type.Object({
             role: Type.Optional(Type.Enum(DefaultProjectRole)),
+            // Platform-WIDE role, unlike `role` above which is scoped to the
+            // one project the token names. Optional, and absent means MEMBER:
+            // a token that does not ask for platform admin must never get it.
+            platformRole: Type.Optional(Type.Enum(PlatformRole)),
             pieces: Type.Optional(Type.Object({
                 filterType: Type.Enum(PiecesFilterType),
                 tags: Type.Optional(Type.Array(Type.String())),
@@ -155,6 +163,7 @@ export type ExternalPrincipal = {
     externalFirstName: string
     externalLastName: string
     projectRole: string
+    platformRole: PlatformRole
     pieces: {
         filterType: PiecesFilterType
         tags: string[]

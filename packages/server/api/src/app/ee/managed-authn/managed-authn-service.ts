@@ -122,6 +122,21 @@ const getOrCreateUser = async (
     })
 
     if (!isNil(existingUser)) {
+        // Re-apply on every sign-in, mirroring how projectMemberService.upsert
+        // re-applies the project role. Returning early instead would mean a
+        // promotion in the issuing system never reaches an account that
+        // already exists -- which is every account after its first login.
+        // userService.update returns UserWithMetaInformation, which has no
+        // identityId -- and the caller needs one. So update, then hand back
+        // the existing User with the new role patched in.
+        if (existingUser.platformRole !== params.platformRole) {
+            await userService.update({
+                id: existingUser.id,
+                platformId: params.platformId,
+                platformRole: params.platformRole,
+            })
+            return { ...existingUser, platformRole: params.platformRole }
+        }
         return existingUser
     }
     const identity = await getOrCreateUserIdentity(params, log)
@@ -129,7 +144,7 @@ const getOrCreateUser = async (
         externalId: params.externalUserId,
         platformId: params.platformId,
         identityId: identity.id,
-        platformRole: PlatformRole.MEMBER,
+        platformRole: params.platformRole,
     })
     return user
 }
@@ -218,6 +233,7 @@ type GetOrCreateUserParams = {
     externalProjectId: string
     externalFirstName: string
     externalLastName: string
+    platformRole: PlatformRole
 }
 
 type GetOrCreateProjectParams = {
