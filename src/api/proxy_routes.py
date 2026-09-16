@@ -67,8 +67,8 @@ USERS_PROJECT_RE = re.compile(
 
 
 class WorkflowPayload(BaseModel):
-    email: str
-    password: str
+    email: Optional[str] = None
+    password: Optional[str] = None
     firstName: Optional[str] = "Workflow"
     lastName: Optional[str] = "User"
     projectId: Optional[str] = None
@@ -158,16 +158,27 @@ async def workflow(payload: WorkflowPayload, request: Request):
         token = auth_header.split("Bearer ")[1].strip()
 
     if token:
-        try:
-            decoded = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=[config.JWT_ALGORITHM])
-            projectId = decoded.get("projectId")
-        except JWTError:
-            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
-
+        projectId = payload.projectId
         if not projectId:
-            projectId = payload.projectId
+            try:
+                decoded = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=[config.JWT_ALGORITHM])
+                projectId = decoded.get("projectId")
+            except JWTError:
+                logger.info(
+                    "Bearer token is not a proxy-issued JWT (expected under "
+                    "managed authentication) and the body carried no projectId."
+                )
 
     if not token:
+        if not payload.email or not payload.password:
+            logger.warning(
+                "No AgentOps session on /workflow and no credentials to sign in "
+                "with; the portal login did not return an ap_token."
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="No AgentOps session. Please sign in again.",
+            )
         ap_data = await asyncio.to_thread(activepieces_service.sign_in, payload.email, payload.password)
         db_manager.store_user_data(ap_data)
         token = ap_data.get("token")
