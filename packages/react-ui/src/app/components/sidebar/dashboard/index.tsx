@@ -1,6 +1,13 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { t } from 'i18next';
-import { Search, Plus, LineChart, Workflow, Compass, Shield } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  LineChart,
+  Workflow,
+  Compass,
+  Shield,
+} from 'lucide-react';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDebounce } from 'use-debounce';
@@ -82,8 +89,8 @@ export function ProjectDashboardSidebar() {
     if (platform.plan.teamProjectsLimit === TeamProjectsLimit.NONE) {
       return false;
     }
-    return true;
-  }, [platform.plan.teamProjectsLimit]);
+    return currentUser?.platformRole === PlatformRole.ADMIN;
+  }, [platform.plan.teamProjectsLimit, currentUser?.platformRole]);
 
   const shouldDisableNewProjectButton = useMemo(() => {
     if (platform.plan.teamProjectsLimit === TeamProjectsLimit.ONE) {
@@ -97,15 +104,27 @@ export function ProjectDashboardSidebar() {
 
   const isSearchMode = debouncedSearchQuery.length > 0;
 
+  const isPlatformAdmin = currentUser?.platformRole === PlatformRole.ADMIN;
+
+  const visibleProjects = useMemo(() => {
+    if (isPlatformAdmin) {
+      return projects;
+    }
+    const currentProject = projects.filter((project) =>
+      location.pathname.includes(`/projects/${project.id}`),
+    );
+    return currentProject.length > 0 ? currentProject : projects.slice(0, 1);
+  }, [isPlatformAdmin, projects, location.pathname]);
+
   const displayProjects = useMemo(() => {
     if (isSearchMode) {
       const query = debouncedSearchQuery.toLowerCase();
-      return projects.filter((project) =>
+      return visibleProjects.filter((project) =>
         project.displayName.toLowerCase().includes(query),
       );
     }
-    return projects;
-  }, [isSearchMode, debouncedSearchQuery, projects]);
+    return visibleProjects;
+  }, [isSearchMode, debouncedSearchQuery, visibleProjects]);
 
   const handleProjectSelect = useCallback(
     async (projectId: string) => {
@@ -191,7 +210,14 @@ export function ProjectDashboardSidebar() {
         <Sidebar
           variant="inset"
           collapsible="icon"
-            className="group p-1 cursor-default [&_[data-sidebar=trigger]]:hidden [&_[data-sidebar=rail]]:hidden"
+          // Platform admins get the built-in sidebar trigger (in the page
+          // header) to collapse/expand; everyone else keeps a fixed sidebar,
+          // so both the trigger and the rail stay hidden for them.
+          className={cn(
+            'group p-1 cursor-default',
+            !isPlatformAdmin &&
+              '[&_[data-sidebar=trigger]]:hidden [&_[data-sidebar=rail]]:hidden',
+          )}
         >
         <AppSidebarHeader />
         <SidebarContent

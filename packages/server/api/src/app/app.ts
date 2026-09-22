@@ -343,6 +343,8 @@ export const setupApp = async (app: FastifyInstance): Promise<FastifyInstance> =
             await app.register(otpModule)
             await app.register(enterpriseLocalAuthnModule)
             await app.register(federatedAuthModule)
+            await app.register(signingKeyModule)
+            await app.register(managedAuthnModule)
 
             setPlatformOAuthService(platformOAuth2Service(app.log))
             await app.register(queueMetricsModule)

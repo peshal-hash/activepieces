@@ -7,10 +7,38 @@ ENV LANG=en_US.UTF-8 \
     NX_DAEMON=false \
     NX_NO_CLOUD=true
 
-# Install all system dependencies in a single layer with cache mounts
+# Debian 11 (bullseye) went EOL on 2026-08-31 and deb.debian.org has since
+# purged it: the InRelease metadata expired on 2026-09-07 and the .deb files
+# now 404. Two weaker fixes do not work, so do not "simplify" back to them:
+#
+#   * Check-Valid-Until=false alone gets past `update`, then `install` fails
+#     because the package files themselves are gone.
+#   * archive.debian.org carries bullseye main but NOT bullseye-security, and
+#     this image has security-suite versions already installed (libc6 u13,
+#     perl-base u4). Archive main only offers u11/u3, and -dev packages must
+#     match the installed runtime exactly, so apt reports "held broken
+#     packages".
+#
+# snapshot.debian.org is the one source that still has both suites at the exact
+# versions this image was built against. The timestamp is pinned deliberately:
+# it makes the build reproducible and must stay at or after the base image's
+# own snapshot date, or the installed security versions reappear as unsatisfiable.
+#
+# Check-Valid-Until=false is still needed -- snapshot metadata is frozen and
+# permanently past its validity window. Packages remain GPG-signed; this
+# relaxes freshness only, not authentication.
+#
+# TEMPORARY: the real fix is moving the base image to bookworm (or
+# node:22-bookworm-slim). That is a separate change because it shifts
+# glibc/OpenSSL and forces a rebuild of the native modules compiled below.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
+    printf '%s\n' \
+    'deb http://snapshot.debian.org/archive/debian/20260901T000000Z bullseye main' \
+    'deb http://snapshot.debian.org/archive/debian-security/20260901T000000Z bullseye-security main' \
+    'deb http://snapshot.debian.org/archive/debian/20260901T000000Z bullseye-updates main' \
+    > /etc/apt/sources.list && \
+    apt-get -o Acquire::Check-Valid-Until=false -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
     apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
     openssh-client \
     python3 \
@@ -91,7 +119,7 @@ WORKDIR /usr/src/app
 # Install Nginx, gettext, unixODBC, and Microsoft SQL Server ODBC Driver 18
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
+    apt-get -o Acquire::Check-Valid-Until=false -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update && \
     apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
     nginx \
     gettext \
@@ -103,7 +131,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     curl -sSL https://packages.microsoft.com/config/debian/11/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb && \
     dpkg -i /tmp/packages-microsoft-prod.deb && \
     rm /tmp/packages-microsoft-prod.deb && \
-    apt-get update && \
+    apt-get -o Acquire::Check-Valid-Until=false update && \
     ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 && \
     rm -rf /var/lib/apt/lists/*
 
