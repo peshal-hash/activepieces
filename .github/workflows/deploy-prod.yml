@@ -1,4 +1,4 @@
-name: Deploy to Azure Dev Environment
+name: Deploy to Azure Production Environment
 
 on:
   push:
@@ -11,12 +11,14 @@ permissions:
   actions: read
   checks: write
 
+# Must match deployment/config.activepieces.prod.sh. The app lives in salesoptai-container-prod,
+# while the ACR, managed environment and identity are shared from testing-containers.
 env:
-  AZURE_RESOURCE_GROUP: testing-containers
+  AZURE_RESOURCE_GROUP: salesoptai-container-prod
   AZURE_ACR_NAME: salesopttest
   AZURE_ENVIRONMENT_NAME: testAPContainerEnvironment
   AZURE_LOCATION: canadacentral
-  AZURE_KEY_VAULT_NAME: salesopt-kv-test
+  AZURE_KEY_VAULT_NAME: salesoptai-prod-keyvault
   APP_NAME_ACTIVEPIECES: agentops
   PYTHON_VERSION: '3.11'
 
@@ -29,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     # needs: test # Uncomment this if you have a 'test' job
     environment:
-      name: development
+      name: production
       url: ${{ steps.deploy.outputs.app_url }}
 
     steps:
